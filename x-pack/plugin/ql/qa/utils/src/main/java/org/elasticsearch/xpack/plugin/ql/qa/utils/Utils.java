@@ -6,4 +6,6 @@
 
 package org.elasticsearch.xpack.plugin.ql.qa.utils;
 
-public class Utils {}
+public class Utils {
+
+}

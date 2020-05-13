@@ -6,6 +6,4 @@
 
 package org.elasticsearch.xpack.plugin.eql.qa.consumer;
 
-import org.elasticsearch.xpack.plugin.ql.qa.utils.Utils;
-
 public class Consumer {}
