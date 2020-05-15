@@ -12,8 +12,15 @@ fun BuildType.agentRequirement(os: Os) {
     }
 }
 
-fun ParametrizedWithType.java14Home(os: Os) {
-    param("env.JAVA_HOME", "%${os.name}.java14.oracle.64bit%")
+fun ParametrizedWithType.javaHomes(os: Os) {
+    // default javaHomes
+
+    param("env.JAVA11_HOME", "%${os.name}.java.openjdk11%")
+    param("env.JAVA12_HOME", "%${os.name}.java.openjdk12%")
+    param("env.JAVA13_HOME", "%${os.name}.java.openjdk13%")
+    param("env.JAVA14_HOME", "%${os.name}.java.openjdk14%")
+
+    param("env.JAVA_HOME", "%${os.name}.java.openjdk14%")
 }
 
 const val useGradleInternalScansServer = "-I gradle/init-scripts/build-scan.init.gradle.kts"
@@ -45,7 +52,7 @@ fun Project.buildType(buildTypeName: String, init: BuildType.() -> Unit): BuildT
         agentRequirement(Os.linux) // default
 
         params {
-            java14Home(Os.linux)
+            javaHomes(Os.linux)
         }
 
         vcs {

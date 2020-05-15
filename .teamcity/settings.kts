@@ -33,7 +33,7 @@ version = "2019.2"
 
 project {
     params {
-        java14Home(Os.linux)
+        javaHomes(Os.linux)
         text("systemProp.org.gradle.internal.publish.checksums.insecure", "true")
     }
 
