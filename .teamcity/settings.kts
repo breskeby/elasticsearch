@@ -37,39 +37,36 @@ project {
         text("systemProp.org.gradle.internal.publish.checksums.insecure", "true")
     }
 
-    val checkPart1 = buildType("Check Part 1") {
+    val sanityCheck = buildType("Sanity Check") {
+    }
+    
+    val checkPart1 = gradleBuildType("Check Part 1") {
         steps {
             gradle {
                 tasks = "checkPart1"
-                buildFile = ""
-                gradleParams = "-Dbwc.checkout.align=true -Dorg.elasticsearch.build.cache.push=true -Dignore.tests.seed -Dscan.capture-task-input-files"
             }
         }
     }
 
-    val checkPart2 = buildType("Check Part 2") {
+    val checkPart2 = gradleBuildType("Check Part 2") {
         steps {
             gradle {
                 tasks = "checkPart2"
-                buildFile = ""
-                gradleParams = "-Dbwc.checkout.align=true -Dorg.elasticsearch.build.cache.push=true -Dignore.tests.seed -Dscan.capture-task-input-files"
             }
         }
     }
 
-    buildType("Verify all") {
+    val intake = buildType("Intake") {
         triggers.vcs {}
+    }
 
-        dependencies {
-            snapshot(checkPart1) {
-                onDependencyFailure = FailureAction.CANCEL
-                onDependencyCancel = FailureAction.CANCEL
-            }
-            snapshot(checkPart2) {
-                onDependencyFailure = FailureAction.CANCEL
-                onDependencyCancel = FailureAction.CANCEL
-            }
+    sequential {
+        buildType(sanityCheck)
+        parallel (options = { onDependencyFailure = FailureAction.CANCEL }) {
+            buildType(checkPart1)
+            buildType(checkPart2)
         }
+        buildType(intake)
     }
 
 }

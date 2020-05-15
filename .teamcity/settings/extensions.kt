@@ -4,6 +4,7 @@ import jetbrains.buildServer.configs.kotlin.v2019_2.DslContext
 import jetbrains.buildServer.configs.kotlin.v2019_2.ParametrizedWithType
 import jetbrains.buildServer.configs.kotlin.v2019_2.Project
 import jetbrains.buildServer.configs.kotlin.v2019_2.RelativeId
+import jetbrains.buildServer.configs.kotlin.v2019_2.buildSteps.gradle
 import jetbrains.buildServer.configs.kotlin.v2019_2.toId
 
 fun BuildType.agentRequirement(os: Os) {
@@ -14,7 +15,6 @@ fun BuildType.agentRequirement(os: Os) {
 
 fun ParametrizedWithType.javaHomes(os: Os) {
     // default javaHomes
-
     param("env.JAVA11_HOME", "%${os.name}.java.openjdk11%")
     param("env.JAVA12_HOME", "%${os.name}.java.openjdk12%")
     param("env.JAVA13_HOME", "%${os.name}.java.openjdk13%")
@@ -23,9 +23,6 @@ fun ParametrizedWithType.javaHomes(os: Os) {
     param("env.JAVA_HOME", "%${os.name}.java.openjdk14%")
 }
 
-const val useGradleInternalScansServer = "-I gradle/init-scripts/build-scan.init.gradle.kts"
-
-const val buildCacheSetup = "--build-cache -Dgradle.cache.remote.url=%gradle.cache.remote.url% -Dgradle.cache.remote.username=%gradle.cache.remote.username% -Dgradle.cache.remote.password=%gradle.cache.remote.password%"
 /**
  * Creates a new subproject with the given name, automatically deriving the [Project.id] from the name.
  *
@@ -64,6 +61,18 @@ fun Project.buildType(buildTypeName: String, init: BuildType.() -> Unit): BuildT
     this.buildTypesOrderIds += buildType.id!!
     return buildType
 }
+
+fun Project.gradleBuildType(buildTypeName: String, init: BuildType.() -> Unit): BuildType {
+    return buildType(buildTypeName, init).apply {
+        steps {
+            gradle {
+                buildFile = ""
+                gradleParams = gradleParams + " -Dbwc.checkout.align=true -Dorg.elasticsearch.build.cache.push=true -Dignore.tests.seed -Dscan.capture-task-input-files"
+            }
+        }
+    }
+}
+
 
 fun stripRootProject(id: String): String {
     return id.replace("${DslContext.projectId.value}_", "")
