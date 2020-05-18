@@ -29,6 +29,9 @@ nbactions.xml
 .gradle/
 build/
 
+# teamcity stuff
+.teamcity/target
+
 # vscode stuff
 .vscode/
 
