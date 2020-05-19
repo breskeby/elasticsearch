@@ -4,6 +4,7 @@ import jetbrains.buildServer.configs.kotlin.v2019_2.DslContext
 import jetbrains.buildServer.configs.kotlin.v2019_2.ParametrizedWithType
 import jetbrains.buildServer.configs.kotlin.v2019_2.Project
 import jetbrains.buildServer.configs.kotlin.v2019_2.RelativeId
+import jetbrains.buildServer.configs.kotlin.v2019_2.buildSteps.GradleBuildStep
 import jetbrains.buildServer.configs.kotlin.v2019_2.buildSteps.gradle
 import jetbrains.buildServer.configs.kotlin.v2019_2.toId
 
@@ -74,10 +75,11 @@ fun Project.buildType(buildTypeName: String, init: BuildType.() -> Unit): BuildT
  * */
 fun Project.gradleBuildType(buildTypeName: String, init: BuildType.() -> Unit): BuildType {
     return buildType(buildTypeName, init).apply {
-        steps {
-            gradle {
-                buildFile = ""
-                gradleParams = gradleParams + " -Dbwc.checkout.align=true -Dorg.elasticsearch.build.cache.push=true -Dignore.tests.seed -Dscan.capture-task-input-files --stacktrace"
+        steps.items.forEach {
+            // dont know a more elegant way yet
+            if(it is GradleBuildStep) {
+                it.buildFile = ""
+                it.gradleParams = (it.gradleParams ?: "") + " -Dbwc.checkout.align=true -Dorg.elasticsearch.build.cache.push=true -Dignore.tests.seed -Dscan.capture-task-input-files --stacktrace"
             }
         }
     }
