@@ -310,7 +310,6 @@ public class GlobalBuildInfoPlugin implements Plugin<Project> {
                 }
 
                 _defaultParallel = socketToCore.values().stream().mapToInt(i -> i).sum();
-                Logging.getLogger(GlobalBuildInfoPlugin.class).lifecycle("Set test parallel to " + _defaultParallel + " based on /proc/cpuinfo");
             } else if (OS.current() == OS.MAC) {
                 // Ask macOS to count physical CPUs for us
                 ByteArrayOutputStream stdout = new ByteArrayOutputStream();
@@ -321,13 +320,9 @@ public class GlobalBuildInfoPlugin implements Plugin<Project> {
                 });
 
                 _defaultParallel = Integer.parseInt(stdout.toString().trim());
-                Logging.getLogger(GlobalBuildInfoPlugin.class).lifecycle("Set test parallel to " + _defaultParallel + " based on osx sysctl");
             }
             _defaultParallel = Math.max(Runtime.getRuntime().availableProcessors() / 2, 1);
-            Logging.getLogger(GlobalBuildInfoPlugin.class).lifecycle("Set test parallel to " + _defaultParallel + " based on fallback");
         }
-
-        Logging.getLogger(GlobalBuildInfoPlugin.class).lifecycle("Set test parallel to " + _defaultParallel + " based on previous calculation");
         return _defaultParallel;
     }
 
