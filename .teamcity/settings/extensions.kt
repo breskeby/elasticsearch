@@ -16,15 +16,15 @@ fun BuildType.agentRequirement(os: Os) {
 //TODO: FIX for windows
 fun ParametrizedWithType.javaDefaults(os: Os) {
     // default javaHomes
-    param("env.JAVA7_HOME", "\$HOME/.java/java7%")
-    param("env.JAVA8_HOME", "\$HOME/.java/java8%")
-    param("env.JAVA9_HOME", "\$HOME/.java/java9%")
-    param("env.JAVA10_HOME", "\$HOME/.java/java10%")
-    param("env.JAVA11_HOME", "\$HOME/.java/java11%")
-    param("env.JAVA12_HOME", "\$HOME/.java/openjdk12%")
-    param("env.JAVA13_HOME", "\$HOME/.java/openjdk13%")
-    param("env.JAVA14_HOME", "\$HOME/.java/openjdk14%")
-    param("env.JAVA_HOME", "\$HOME/.java/\$ES_BUILD_JAVA")
+    param("env.JAVA7_HOME", "%teamcity.agent.jvm.user.home%/.java/java7%")
+    param("env.JAVA8_HOME", "%teamcity.agent.jvm.user.home%/.java/java8")
+    param("env.JAVA9_HOME", "%teamcity.agent.jvm.user.home%/.java/java9")
+    param("env.JAVA10_HOME", "%teamcity.agent.jvm.user.home%/.java/java10")
+    param("env.JAVA11_HOME", "%teamcity.agent.jvm.user.home%/.java/java11")
+    param("env.JAVA12_HOME", "%teamcity.agent.jvm.user.home%/.java/openjdk12")
+    param("env.JAVA13_HOME", "%teamcity.agent.jvm.user.home%/.java/openjdk13")
+    param("env.JAVA14_HOME", "%teamcity.agent.jvm.user.home%/.java/openjdk14")
+    param("env.JAVA_HOME", "%teamcity.agent.jvm.user.home%/.java/openjdk14")
 
     param("env.GRADLE_OPTS", "-XX:+HeapDumpOnOutOfMemoryError -Xmx128m -Xms128m")
     param("GRADLEW", "/gradlew --parallel --scan --build-cache -Dorg.elasticsearch.build.cache.url=https://gradle-enterprise.elastic.co/cache/")
