@@ -281,6 +281,7 @@ public class GlobalBuildInfoPlugin implements Plugin<Project> {
         // It's safe to store this in a static variable since it's just a primitive so leaking memory isn't an issue
         if (_defaultParallel == null) {
             File cpuInfoFile = new File("/proc/cpuinfo");
+            System.out.println("cpuInfoFile.getAbsolutePath() = " + cpuInfoFile.getAbsolutePath());
             if (cpuInfoFile.exists()) {
                 // Count physical cores on any Linux distro ( don't count hyper-threading )
                 Map<String, Integer> socketToCore = new HashMap<>();
@@ -322,7 +323,7 @@ public class GlobalBuildInfoPlugin implements Plugin<Project> {
                 _defaultParallel = Integer.parseInt(stdout.toString().trim());
                 Logging.getLogger(GlobalBuildInfoPlugin.class).lifecycle("Set test parallel to " + _defaultParallel + " based on osx sysctl");
             }
-            _defaultParallel = Runtime.getRuntime().availableProcessors() / 2;
+            _defaultParallel = Math.max(Runtime.getRuntime().availableProcessors() / 2, 1);
             Logging.getLogger(GlobalBuildInfoPlugin.class).lifecycle("Set test parallel to " + _defaultParallel + " based on fallback");
         }
 
