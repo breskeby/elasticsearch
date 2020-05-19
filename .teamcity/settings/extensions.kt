@@ -79,7 +79,13 @@ fun Project.gradleBuildType(buildTypeName: String, init: BuildType.() -> Unit): 
             // dont know a more elegant way yet
             if(it is GradleBuildStep) {
                 it.buildFile = ""
-                it.gradleParams = (it.gradleParams ?: "") + " -Dbwc.checkout.align=true -Dorg.elasticsearch.build.cache.push=true -Dignore.tests.seed -Dscan.capture-task-input-files --stacktrace"
+                it.gradleParams = (it.gradleParams ?: "") +
+                        " -Dbwc.checkout.align=true" +
+                        " -Dorg.elasticsearch.build.cache.push=true" +
+                        " -Dscan.capture-task-input-files" +
+                        " --parallel" + " --scan" + " --build-cache" +
+                        " -Dorg.elasticsearch.build.cache.url=https://gradle-enterprise.elastic.co/cache/" +
+                        "--stacktrace"
             }
         }
     }
