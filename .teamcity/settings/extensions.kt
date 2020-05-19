@@ -51,7 +51,7 @@ fun Project.subProject(projectName: String, init: Project.() -> Unit): Project {
 fun Project.buildType(buildTypeName: String, init: BuildType.() -> Unit): BuildType {
     val buildType = buildType {
         name = buildTypeName
-        id = RelativeId(name.toId(stripRootProject(this@buildType.id.toString())))
+        id = RelativeId(name)
 
         artifactRules = "build/reports/** => reports"
         agentRequirement(Os.linux) // default
