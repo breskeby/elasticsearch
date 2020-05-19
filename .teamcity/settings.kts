@@ -35,7 +35,16 @@ project {
         text("systemProp.org.gradle.internal.publish.checksums.insecure", "true")
     }
 
-    val sanityCheck = buildType("Sanity Check") {
+    val sanityCheck = gradleBuildType("Sanity Check") {
+        //Discuss how we organize branches
+        //description = "The Elasticsearch {branch} branch fast check."
+        description = "The Elasticsearch fast check."
+        steps {
+            gradle {
+                gradleParams = "-Dignore.tests.seed"
+                tasks = "precommit"
+            }
+        }
     }
 
     val checkPart1 = gradleBuildType("Check Part 1") {
