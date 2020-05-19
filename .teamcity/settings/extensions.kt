@@ -69,12 +69,15 @@ fun Project.buildType(buildTypeName: String, init: BuildType.() -> Unit): BuildT
     return buildType
 }
 
+/**
+ * Provides a build type that runs gradle with default parameters already applied
+ * */
 fun Project.gradleBuildType(buildTypeName: String, init: BuildType.() -> Unit): BuildType {
     return buildType(buildTypeName, init).apply {
         steps {
             gradle {
                 buildFile = ""
-                gradleParams = gradleParams + " -Dbwc.checkout.align=true -Dorg.elasticsearch.build.cache.push=true -Dignore.tests.seed -Dscan.capture-task-input-files"
+                gradleParams = gradleParams + " -Dbwc.checkout.align=true -Dorg.elasticsearch.build.cache.push=true -Dignore.tests.seed -Dscan.capture-task-input-files --stacktrace"
             }
         }
     }
