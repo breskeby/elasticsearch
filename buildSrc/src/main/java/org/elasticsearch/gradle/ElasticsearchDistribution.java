@@ -208,9 +208,27 @@ public class ElasticsearchDistribution implements Buildable, Iterable<File> {
         return this.architecture.get();
     }
 
+//    @Override
+//    public String toString() {
+//        return configuration.getSingleFile().toString();
+//    }
+
+
     @Override
     public String toString() {
-        return configuration.getSingleFile().toString();
+        return "ElasticsearchDistribution{" +
+            "name='" + name + '\'' +
+            ", dockerSupport=" + dockerSupport +
+            ", configuration=" + configuration +
+            ", extracted=" + extracted +
+            ", architecture=" + architecture +
+            ", version=" + version +
+            ", type=" + type +
+            ", platform=" + platform +
+            ", flavor=" + flavor +
+            ", bundledJdk=" + bundledJdk +
+            ", failIfUnavailable=" + failIfUnavailable +
+            '}';
     }
 
     public Extracted getExtracted() {
