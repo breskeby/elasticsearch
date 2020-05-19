@@ -85,7 +85,8 @@ fun Project.gradleBuildType(buildTypeName: String, init: BuildType.() -> Unit): 
                         " -Dscan.capture-task-input-files" +
                         " --parallel" + " --scan" + " --build-cache" +
                         " -Dorg.elasticsearch.build.cache.url=https://gradle-enterprise.elastic.co/cache/" +
-                        "--stacktrace"
+                        " -i" +
+                        " --stacktrace"
             }
         }
     }
