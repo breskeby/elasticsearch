@@ -281,7 +281,6 @@ public class GlobalBuildInfoPlugin implements Plugin<Project> {
         // It's safe to store this in a static variable since it's just a primitive so leaking memory isn't an issue
         if (_defaultParallel == null) {
             File cpuInfoFile = new File("/proc/cpuinfo");
-            System.out.println("cpuInfoFile.getAbsolutePath() = " + cpuInfoFile.getAbsolutePath());
             if (cpuInfoFile.exists()) {
                 // Count physical cores on any Linux distro ( don't count hyper-threading )
                 Map<String, Integer> socketToCore = new HashMap<>();
