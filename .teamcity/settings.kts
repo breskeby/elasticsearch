@@ -1,8 +1,6 @@
 import jetbrains.buildServer.configs.kotlin.v2019_2.FailureAction
-import jetbrains.buildServer.configs.kotlin.v2019_2.ParameterDisplay
 import jetbrains.buildServer.configs.kotlin.v2019_2.buildSteps.gradle
 import jetbrains.buildServer.configs.kotlin.v2019_2.project
-import jetbrains.buildServer.configs.kotlin.v2019_2.triggers.schedule
 import jetbrains.buildServer.configs.kotlin.v2019_2.triggers.vcs
 import jetbrains.buildServer.configs.kotlin.v2019_2.version
 import jetbrains.buildServer.configs.kotlin.v2019_2.*
@@ -33,13 +31,13 @@ version = "2019.2"
 
 project {
     params {
-        javaHomes(Os.linux)
+        javaDefaults(Os.linux)
         text("systemProp.org.gradle.internal.publish.checksums.insecure", "true")
     }
 
     val sanityCheck = buildType("Sanity Check") {
     }
-    
+
     val checkPart1 = gradleBuildType("Check Part 1") {
         steps {
             gradle {
