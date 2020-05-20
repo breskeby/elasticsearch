@@ -40,7 +40,7 @@ fun Project.subProject(projectName: String, init: Project.() -> Unit): Project {
     val parent = this
     val subProject = subProject {
         name = projectName
-        id = RelativeId(name.toId(stripRootProject(parent.id.toString())))
+        id = RelativeId(name.toId())
     }.apply(init)
 
     this.subProjectsOrder += subProject.id!!
@@ -51,7 +51,7 @@ fun Project.subProject(projectName: String, init: Project.() -> Unit): Project {
 fun Project.buildType(buildTypeName: String, init: BuildType.() -> Unit): BuildType {
     val buildType = buildType {
         name = buildTypeName
-        id = RelativeId(name)
+        id = RelativeId(name.toId())
 
         artifactRules = "build/reports/** => reports"
         agentRequirement(Os.linux) // default
