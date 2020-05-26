@@ -27,7 +27,7 @@ fun ParametrizedWithType.javaDefaults(os: Os) {
     param("env.JAVA14_HOME", "%teamcity.agent.jvm.user.home%/.java/openjdk14")
     param("env.JAVA_HOME", "%teamcity.agent.jvm.user.home%/.java/openjdk14")
 
-    param("env.GRADLE_OPTS", "-XX:+HeapDumpOnOutOfMemoryError -Xmx128m -Xms128m")
+    param("env.GRADLE_OPTS", "-XX:+HeapDumpOnOutOfMemoryError")
     param("GRADLEW", "/gradlew --parallel --scan --build-cache -Dorg.elasticsearch.build.cache.url=https://gradle-enterprise.elastic.co/cache/")
 }
 
