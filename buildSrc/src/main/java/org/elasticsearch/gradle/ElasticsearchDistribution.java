@@ -20,6 +20,7 @@
 package org.elasticsearch.gradle;
 
 import org.elasticsearch.gradle.docker.DockerSupportService;
+import org.elasticsearch.gradle.info.BuildParams;
 import org.gradle.api.Buildable;
 import org.gradle.api.artifacts.Configuration;
 import org.gradle.api.model.ObjectFactory;
@@ -307,5 +308,12 @@ public class ElasticsearchDistribution implements Buildable, Iterable<File> {
         type.finalizeValue();
         flavor.finalizeValue();
         bundledJdk.finalizeValue();
+    }
+
+    public boolean isLocal() {
+        return BuildParams.isInternal()
+            ? (VersionProperties.getElasticsearch().equals(getVersion())
+                || BuildParams.getBwcVersions().unreleasedInfo(Version.fromString(getVersion())) != null)
+            : false;
     }
 }
