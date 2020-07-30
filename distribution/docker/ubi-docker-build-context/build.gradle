@@ -2,12 +2,19 @@ import org.elasticsearch.gradle.Architecture
 
 apply plugin: 'base'
 
+configurations {
+  checksumfile
+}
+
+dependencies {
+  checksumfile project(path: ":distribution:archives:linux-tar")
+}
 task buildUbiDockerBuildContext(type: Tar) {
   archiveExtension = 'tar.gz'
   compression = Compression.GZIP
   archiveClassifier = "docker-build-context"
   archiveBaseName = "elasticsearch-ubi7"
-  with dockerBuildContext(Architecture.X64, false, true, false)
+  with dockerBuildContext(Architecture.X64, false, true, false, project)
 }
 
 assemble.dependsOn buildUbiDockerBuildContext
