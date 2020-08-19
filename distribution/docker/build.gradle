@@ -294,6 +294,16 @@ subprojects { Project subProject ->
     final String tarFile = "${parent.projectDir}/build/${artifactName}_${VersionProperties.elasticsearch}.${extension}"
 
     tasks.register(exportTaskName, LoggedExec) {
+
+      outputs.upToDateWhen {
+        project.exec {
+          ignoreExitValue = true
+          executable 'docker'
+          args "image",
+                  "inspect",
+                  "elasticsearch${suffix}:test"
+        }.exitValue == 0
+      }
       inputs.file("${parent.projectDir}/build/markers/${buildTaskName}.marker")
       executable 'docker'
       outputs.file(tarFile)
