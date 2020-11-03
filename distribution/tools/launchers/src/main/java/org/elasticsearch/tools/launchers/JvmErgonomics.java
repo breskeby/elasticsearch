@@ -23,7 +23,6 @@ import org.elasticsearch.tools.java_version_checker.JavaVersion;
 import org.elasticsearch.tools.java_version_checker.SuppressForbidden;
 
 import java.io.BufferedReader;
-import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
@@ -193,6 +192,8 @@ final class JvmErgonomics {
     }
 
     static boolean tuneG1GCHeapRegion(final Map<String, JvmOption> finalJvmOptions, final boolean tuneG1GCForSmallHeap) {
+        debugOutputOptions(finalJvmOptions, "/Users/rene/dev/elasticsearch/debugg-tuneG1GCHeapRegion.txt");
+
         // Launchers.outPrintln("finalJvmOptions = " + finalJvmOptions);
         JvmOption g1GCHeapRegion = finalJvmOptions.get("G1HeapRegionSize");
         JvmOption g1GC = finalJvmOptions.get("UseG1GC");
@@ -212,9 +213,16 @@ final class JvmErgonomics {
         return 0;
     }
 
-    @SuppressForbidden(reason = "FileWriter#init")
     static boolean tuneG1GCInitiatingHeapOccupancyPercent(final Map<String, JvmOption> finalJvmOptions) {
-        File file = new File("/Users/rene/dev/elasticsearch/debugg.txt");
+        debugOutputOptions(finalJvmOptions, "/Users/rene/dev/elasticsearch/debugg-tuneG1GCInitiatingHeapOccupancyPercent.txt");
+        // Launchers.createTempDirectory("debugg", )
+        JvmOption g1GC = finalJvmOptions.get("UseG1GC");
+        JvmOption g1GCInitiatingHeapOccupancyPercent = finalJvmOptions.get("InitiatingHeapOccupancyPercent");
+        return g1GCInitiatingHeapOccupancyPercent.isCommandLineOrigin() == false && g1GC.getMandatoryValue().equals("true");
+    }
+
+    @SuppressForbidden(reason = "String#getBytes")
+    private static void debugOutputOptions(Map<String, JvmOption> finalJvmOptions, String targetPath) {
         List<String> output = finalJvmOptions.entrySet().stream().map(new Function<Map.Entry<String, JvmOption>, String>() {
             @Override
             public String apply(Map.Entry<String, JvmOption> e) {
@@ -222,12 +230,8 @@ final class JvmErgonomics {
             }
         }).collect(Collectors.toList());
         try {
-            Files.write(Paths.get("/Users/rene/dev/elasticsearch/debugg.txt"), ("" + output).getBytes());
+            Files.write(Paths.get(targetPath), ("" + output).getBytes());
         } catch (IOException ioException) {}
-        // Launchers.createTempDirectory("debugg", )
-        JvmOption g1GC = finalJvmOptions.get("UseG1GC");
-        JvmOption g1GCInitiatingHeapOccupancyPercent = finalJvmOptions.get("InitiatingHeapOccupancyPercent");
-        return g1GCInitiatingHeapOccupancyPercent.isCommandLineOrigin() == false && g1GC.getMandatoryValue().equals("true");
     }
 
     private static final Pattern SYSTEM_PROPERTY = Pattern.compile("^-D(?<key>[\\w+].*?)=(?<value>.*)$");
