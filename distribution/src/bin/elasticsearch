@@ -54,6 +54,7 @@ fi
 #   - fourth, ergonomic JVM options are applied
 ES_JAVA_OPTS=`export ES_TMPDIR; "$JAVA" "$XSHARE" -cp "$ES_CLASSPATH" org.elasticsearch.tools.launchers.JvmOptionsParser "$ES_PATH_CONF"`
 
+echo $ES_JAVA_OPTS
 # manual parsing to find out, if process should be detached
 if [[ $DAEMONIZE = false ]]; then
   exec \

@@ -189,6 +189,7 @@ final class JvmErgonomics {
     }
 
     static boolean tuneG1GCHeapRegion(final Map<String, JvmOption> finalJvmOptions, final boolean tuneG1GCForSmallHeap) {
+//        Launchers.outPrintln("finalJvmOptions = " + finalJvmOptions);
         JvmOption g1GCHeapRegion = finalJvmOptions.get("G1HeapRegionSize");
         JvmOption g1GC = finalJvmOptions.get("UseG1GC");
         return (tuneG1GCForSmallHeap && g1GC.getMandatoryValue().equals("true") && g1GCHeapRegion.isCommandLineOrigin() == false);
@@ -208,8 +209,8 @@ final class JvmErgonomics {
     }
 
     static boolean tuneG1GCInitiatingHeapOccupancyPercent(final Map<String, JvmOption> finalJvmOptions) {
-        Launchers.outPrintln("finalJvmOptions = " + finalJvmOptions);
-
+//        Launchers.outPrintln("finalJvmOptions = " + finalJvmOptions);
+//        System.out.println("finalJvmOptions = " + finalJvmOptions);
         JvmOption g1GC = finalJvmOptions.get("UseG1GC");
         JvmOption g1GCInitiatingHeapOccupancyPercent = finalJvmOptions.get("InitiatingHeapOccupancyPercent");
         return g1GCInitiatingHeapOccupancyPercent.isCommandLineOrigin() == false && g1GC.getMandatoryValue().equals("true");
