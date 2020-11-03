@@ -208,6 +208,8 @@ final class JvmErgonomics {
     }
 
     static boolean tuneG1GCInitiatingHeapOccupancyPercent(final Map<String, JvmOption> finalJvmOptions) {
+        Launchers.outPrintln("finalJvmOptions = " + finalJvmOptions);
+
         JvmOption g1GC = finalJvmOptions.get("UseG1GC");
         JvmOption g1GCInitiatingHeapOccupancyPercent = finalJvmOptions.get("InitiatingHeapOccupancyPercent");
         return g1GCInitiatingHeapOccupancyPercent.isCommandLineOrigin() == false && g1GC.getMandatoryValue().equals("true");
