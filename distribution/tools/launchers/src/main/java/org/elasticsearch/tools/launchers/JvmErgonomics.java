@@ -20,12 +20,15 @@
 package org.elasticsearch.tools.launchers;
 
 import org.elasticsearch.tools.java_version_checker.JavaVersion;
+import org.elasticsearch.tools.java_version_checker.SuppressForbidden;
 
 import java.io.BufferedReader;
+import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -34,6 +37,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Optional;
+import java.util.function.Function;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.util.stream.Collectors;
@@ -189,7 +193,7 @@ final class JvmErgonomics {
     }
 
     static boolean tuneG1GCHeapRegion(final Map<String, JvmOption> finalJvmOptions, final boolean tuneG1GCForSmallHeap) {
-//        Launchers.outPrintln("finalJvmOptions = " + finalJvmOptions);
+        // Launchers.outPrintln("finalJvmOptions = " + finalJvmOptions);
         JvmOption g1GCHeapRegion = finalJvmOptions.get("G1HeapRegionSize");
         JvmOption g1GC = finalJvmOptions.get("UseG1GC");
         return (tuneG1GCForSmallHeap && g1GC.getMandatoryValue().equals("true") && g1GCHeapRegion.isCommandLineOrigin() == false);
@@ -208,9 +212,19 @@ final class JvmErgonomics {
         return 0;
     }
 
+    @SuppressForbidden(reason = "FileWriter#init")
     static boolean tuneG1GCInitiatingHeapOccupancyPercent(final Map<String, JvmOption> finalJvmOptions) {
-//        Launchers.outPrintln("finalJvmOptions = " + finalJvmOptions);
-//        System.out.println("finalJvmOptions = " + finalJvmOptions);
+        File file = new File("/Users/rene/dev/elasticsearch/debugg.txt");
+        List<String> output = finalJvmOptions.entrySet().stream().map(new Function<Map.Entry<String, JvmOption>, String>() {
+            @Override
+            public String apply(Map.Entry<String, JvmOption> e) {
+                return e.getKey() + " -- " + e.getValue().getValue().orElse("NULLL") + "\n";
+            }
+        }).collect(Collectors.toList());
+        try {
+            Files.write(Paths.get("/Users/rene/dev/elasticsearch/debugg.txt"), ("" + output).getBytes());
+        } catch (IOException ioException) {}
+        // Launchers.createTempDirectory("debugg", )
         JvmOption g1GC = finalJvmOptions.get("UseG1GC");
         JvmOption g1GCInitiatingHeapOccupancyPercent = finalJvmOptions.get("InitiatingHeapOccupancyPercent");
         return g1GCInitiatingHeapOccupancyPercent.isCommandLineOrigin() == false && g1GC.getMandatoryValue().equals("true");
