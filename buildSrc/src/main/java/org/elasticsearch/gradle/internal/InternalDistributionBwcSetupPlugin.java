@@ -251,7 +251,7 @@ public class InternalDistributionBwcSetupPlugin implements Plugin<Project> {
             );
             // we only ported this down to the 7.x branch.
             if (version.onOrAfter("7.10.0") && (name.endsWith("zip") || name.endsWith("tar"))) {
-                this.expandedDistDir = new File(checkoutDir, baseDir + "/" + name + "/build/install");
+                this.expandedDistDir = new File(checkoutDir, baseDir + "/" + name + "/build/install/" + version.toString());
             }
         }
 
