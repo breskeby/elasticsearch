@@ -35,7 +35,7 @@ public abstract class PrecommitPlugin implements Plugin<Project> {
                 p -> {
                     // We want to get any compilation error before running the pre-commit checks.
                     for (SourceSet sourceSet : GradleUtils.getJavaSourceSets(project)) {
-                        task.configure(t -> t.shouldRunAfter(sourceSet.getClassesTaskName()));
+//                        task.configure(t -> t.shouldRunAfter(sourceSet.getClassesTaskName()));
                     }
                 }
             );

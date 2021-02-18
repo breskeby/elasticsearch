@@ -30,7 +30,6 @@ public class JarHellPrecommitPlugin extends PrecommitPlugin {
         jarHell.configure(t -> {
             SourceSet testSourceSet = Util.getJavaTestSourceSet(project).get();
             t.setClasspath(testSourceSet.getRuntimeClasspath().plus(jarHellConfig));
-            t.dependsOn(jarHellConfig);
         });
 
         return jarHell;

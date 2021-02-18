@@ -42,7 +42,7 @@ public class PrecommitTaskPlugin implements Plugin<Project> {
                     }
 
                     // make sure tests run after all precommit tasks
-                    project.getTasks().withType(Test.class).configureEach(t -> t.mustRunAfter(precommit));
+//                    project.getTasks().withType(Test.class).configureEach(t -> t.mustRunAfter(precommit));
                 }
             );
     }
