@@ -398,9 +398,9 @@ allprojects {
     prefix = prefix.replace(':', '_')
   }
   if (eclipse.project.name.startsWith(prefix)) {
-    licenseHeaderFile = new File(project.rootDir, 'buildSrc/src/main/resources/license-headers/elastic-license-2.0-header.txt')
+    licenseHeaderFile = new File(project.rootDir, 'build-tools/src/main/resources/license-headers/elastic-license-2.0-header.txt')
   } else {
-    licenseHeaderFile = new File(project.rootDir, 'buildSrc/src/main/resources/license-headers/sspl+elastic-license-header.txt')
+    licenseHeaderFile = new File(project.rootDir, 'build-tools/src/main/resources/license-headers/sspl+elastic-license-header.txt')
   }
 
   String lineSeparator = Os.isFamily(Os.FAMILY_WINDOWS) ? '\\\\r\\\\n' : '\\\\n'

@@ -36,6 +36,148 @@ gradlePlugin {
   // We already configure publication and we don't need or want the one that comes
   // with the java-gradle-plugin
   automatedPublishing = false
+  plugins {
+    build {
+      id = 'elasticsearch.build'
+      implementationClass = 'org.elasticsearch.gradle.internal.BuildPlugin'
+    }
+    distributionDownload {
+      id = 'elasticsearch.distribution-download'
+      implementationClass = 'org.elasticsearch.gradle.DistributionDownloadPlugin'
+    }
+    distroTest {
+      id = 'elasticsearch.distro-test'
+      implementationClass = 'org.elasticsearch.gradle.internal.test.DistroTestPlugin'
+    }
+    dockerSupport {
+      id = 'elasticsearch.docker-support'
+      implementationClass = 'org.elasticsearch.gradle.internal.docker.DockerSupportPlugin'
+    }
+    docsTest {
+      id = 'elasticsearch.docs-test'
+      implementationClass = 'org.elasticsearch.gradle.internal.doc.DocsTestPlugin'
+    }
+    esPlugin {
+      id = 'elasticsearch.esplugin'
+      implementationClass = 'org.elasticsearch.gradle.plugin.PluginBuildPlugin'
+    }
+    globalBuildInfo {
+      id = 'elasticsearch.global-build-info'
+      implementationClass = 'org.elasticsearch.gradle.internal.info.GlobalBuildInfoPlugin'
+    }
+    internalAvailablePorts {
+      id = 'elasticsearch.internal-available-ports'
+      implementationClass = 'org.elasticsearch.gradle.internal.InternalAvailableTcpPortProviderPlugin'
+    }
+    internalClusterTest {
+      id = 'elasticsearch.internal-cluster-test'
+      implementationClass = 'org.elasticsearch.gradle.internal.test.InternalClusterTestPlugin'
+    }
+    internalDistributionArchiveCheck {
+      id = 'elasticsearch.internal-distribution-archive-check'
+      implementationClass = 'org.elasticsearch.gradle.internal.InternalDistributionArchiveCheckPlugin'
+    }
+    internalDistributionArchiveSetup {
+      id = 'elasticsearch.internal-distribution-archive-setup'
+      implementationClass = 'org.elasticsearch.gradle.internal.InternalDistributionArchiveSetupPlugin'
+    }
+    internalDistributionBwcSetup {
+      id = 'elasticsearch.internal-distribution-bwc-setup'
+      implementationClass = 'org.elasticsearch.gradle.internal.InternalDistributionBwcSetupPlugin'
+    }
+    internalDistributionDownload {
+      id = 'elasticsearch.internal-distribution-download'
+      implementationClass = 'org.elasticsearch.gradle.internal.InternalDistributionDownloadPlugin'
+    }
+    internalLicenseheaders {
+      id = 'elasticsearch.internal-licenseheaders'
+      implementationClass = 'org.elasticsearch.gradle.internal.precommit.LicenseHeadersPrecommitPlugin'
+    }
+    internalTestArtifact {
+      id = 'elasticsearch.internal-test-artifact'
+      implementationClass = 'org.elasticsearch.gradle.internal.InternalTestArtifactPlugin'
+    }
+    internalTestArtifactBase {
+      id = 'elasticsearch.internal-test-artifact-base'
+      implementationClass = 'org.elasticsearch.gradle.internal.InternalTestArtifactBasePlugin'
+    }
+    internalTestRerun {
+      id = 'elasticsearch.internal-test-rerun'
+      implementationClass = 'org.elasticsearch.gradle.internal.test.rerun.TestRerunPlugin'
+    }
+    java {
+      id = 'elasticsearch.java'
+      implementationClass = 'org.elasticsearch.gradle.internal.ElasticsearchJavaPlugin'
+    }
+    javaRestTest {
+      id = 'elasticsearch.java-rest-test'
+      implementationClass = 'org.elasticsearch.gradle.internal.test.rest.JavaRestTestPlugin'
+    }
+    jdkDownload {
+      id = 'elasticsearch.jdk-download'
+      implementationClass = 'org.elasticsearch.gradle.internal.JdkDownloadPlugin'
+    }
+    publish {
+      id = 'elasticsearch.publish'
+      implementationClass = 'org.elasticsearch.gradle.internal.PublishPlugin'
+    }
+    reaper {
+      id = 'elasticsearch.reaper'
+      implementationClass = 'org.elasticsearch.gradle.ReaperPlugin'
+    }
+    repositories {
+      id = 'elasticsearch.repositories'
+      implementationClass = 'org.elasticsearch.gradle.internal.RepositoriesSetupPlugin'
+    }
+    restResources {
+      id = 'elasticsearch.rest-resources'
+      implementationClass = 'org.elasticsearch.gradle.internal.test.rest.RestResourcesPlugin'
+    }
+    restTest {
+      id = 'elasticsearch.rest-test'
+      implementationClass = 'org.elasticsearch.gradle.internal.test.RestTestPlugin'
+    }
+    standaloneRestTest {
+      id = 'elasticsearch.standalone-rest-test'
+      implementationClass = 'org.elasticsearch.gradle.internal.test.StandaloneRestTestPlugin'
+    }
+    standaloneTest {
+      id = 'elasticsearch.standalone-test'
+      implementationClass = 'org.elasticsearch.gradle.internal.test.StandaloneTestPlugin'
+    }
+    testFixtures {
+      id = 'elasticsearch.test.fixtures'
+      implementationClass = 'org.elasticsearch.gradle.internal.testfixtures.TestFixturesPlugin'
+    }
+    testBase {
+      id = 'elasticsearch.test-base'
+      implementationClass = 'org.elasticsearch.gradle.internal.ElasticsearchTestBasePlugin'
+    }
+    testWithDependencies {
+      id = 'elasticsearch.test-with-dependencies'
+      implementationClass = 'org.elasticsearch.gradle.internal.test.TestWithDependenciesPlugin'
+    }
+    testWithSsl {
+      id = 'elasticsearch.test-with-ssl'
+      implementationClass = 'org.elasticsearch.gradle.internal.test.TestWithSslPlugin'
+    }
+    testclusters {
+      id = 'elasticsearch.testclusters'
+      implementationClass = 'org.elasticsearch.gradle.testclusters.TestClustersPlugin'
+    }
+    validateRestSpec {
+      id = 'elasticsearch.validate-rest-spec'
+      implementationClass = 'org.elasticsearch.gradle.internal.precommit.ValidateRestSpecPlugin'
+    }
+    yamlRestCompatTest {
+      id = 'elasticsearch.yaml-rest-compat-test'
+      implementationClass = 'org.elasticsearch.gradle.internal.rest.compat.YamlRestCompatTestPlugin'
+    }
+    yamlRestTest {
+      id = 'elasticsearch.yaml-rest-test'
+      implementationClass = 'org.elasticsearch.gradle.internal.test.rest.YamlRestTestPlugin'
+    }
+  }
 }
 def generateVersionProperties = tasks.register("generateVersionProperties", WriteProperties) {
   outputFile = "${buildDir}/version.properties"
@@ -163,52 +305,52 @@ if (project == rootProject) {
 
 // this happens when included as a normal project in the build, which we do
 // to enforce precommit checks like forbidden apis, as well as setup publishing
-if (project != rootProject) {
-  apply plugin: 'elasticsearch.build'
-  apply plugin: 'elasticsearch.publish'
+//if (project != rootProject) {
+//  apply plugin: 'elasticsearch.build'
+//  apply plugin: 'elasticsearch.publish'
 
   // groovydoc succeeds, but has some weird internal exception...
-  tasks.named("groovydoc").configure {
-    enabled = false
-  }
-
-  // build-tools is not ready for primetime with these...
-  tasks.named("dependencyLicenses").configure { enabled = false }
-  tasks.named("dependenciesInfo").configure {enabled = false }
-  tasks.named("dependenciesGraph").configure {enabled = false }
-  disableTasks('forbiddenApisMain', 'forbiddenApisTest', 'forbiddenApisIntegTest', 'forbiddenApisTestFixtures')
-  tasks.named("jarHell").configure {
-    enabled = false
-  }
-  tasks.named("thirdPartyAudit").configure {
-    enabled = false
-  }
+//  tasks.named("groovydoc").configure {
+//    enabled = false
+//  }
+//
+//  // build-tools is not ready for primetime with these...
+//  tasks.named("dependencyLicenses").configure { enabled = false }
+//  tasks.named("dependenciesInfo").configure {enabled = false }
+//  tasks.named("dependenciesGraph").configure {enabled = false }
+//  disableTasks('forbiddenApisMain', 'forbiddenApisTest', 'forbiddenApisIntegTest', 'forbiddenApisTestFixtures')
+//  tasks.named("jarHell").configure {
+//    enabled = false
+//  }
+//  tasks.named("thirdPartyAudit").configure {
+//    enabled = false
+//  }
   configurations.register("distribution")
   configurations.register("reaper")
 
   dependencies {
     reaper project('reaper')
-    distribution project(':distribution:archives:windows-zip')
-    distribution project(':distribution:archives:darwin-tar')
-    distribution project(':distribution:archives:darwin-aarch64-tar')
-    distribution project(':distribution:archives:linux-aarch64-tar')
-    distribution project(':distribution:archives:linux-tar')
-    integTestRuntimeOnly(project(":libs:elasticsearch-core"))
+//    distribution project(':distribution:archives:windows-zip')
+//    distribution project(':distribution:archives:darwin-tar')
+//    distribution project(':distribution:archives:darwin-aarch64-tar')
+//    distribution project(':distribution:archives:linux-aarch64-tar')
+//    distribution project(':distribution:archives:linux-tar')
+//    integTestRuntimeOnly(project(":libs:elasticsearch-core"))
   }
 
-  eclipse {
-    classpath {
-      plusConfigurations += [configurations.integTestRuntimeClasspath]
-    }
-  }
+//  eclipse {
+//    classpath {
+//      plusConfigurations += [configurations.integTestRuntimeClasspath]
+//    }
+//  }
 
   // for external projects we want to remove the marker file indicating we are running the Elasticsearch project
-  tasks.named("processResources").configure {
-    exclude 'buildSrc.marker'
-    into('META-INF') {
-      from configurations.reaper
-    }
-  }
+//  tasks.named("processResources").configure {
+//    exclude 'buildSrc.marker'
+//    into('META-INF') {
+//      from configurations.reaper
+//    }
+//  }
 
   // Track reaper jar as a test input using runtime classpath normalization strategy
   tasks.withType(Test).configureEach {
@@ -222,27 +364,27 @@ if (project != rootProject) {
     }
   }
 
-  tasks.named("forbiddenPatterns").configure {
-    exclude '**/*.wav'
-    exclude '**/*.p12'
-    exclude '**/*.jks'
-    exclude '**/*.crt'
-    // the file that actually defines nocommit
-    exclude '**/ForbiddenPatternsTask.java'
-    exclude '**/*.bcfks'
-  }
-
-  tasks.named("testingConventions") {
-    naming.clear()
-    naming {
-      Tests {
-        baseClass 'org.elasticsearch.gradle.internal.test.GradleUnitTestCase'
-      }
-      IT {
-        baseClass 'org.elasticsearch.gradle.internal.test.GradleIntegrationTestCase'
-      }
-    }
-  }
+//  tasks.named("forbiddenPatterns").configure {
+//    exclude '**/*.wav'
+//    exclude '**/*.p12'
+//    exclude '**/*.jks'
+//    exclude '**/*.crt'
+//    // the file that actually defines nocommit
+//    exclude '**/ForbiddenPatternsTask.java'
+//    exclude '**/*.bcfks'
+//  }
+//
+//  tasks.named("testingConventions") {
+//    naming.clear()
+//    naming {
+//      Tests {
+//        baseClass 'org.elasticsearch.gradle.internal.test.GradleUnitTestCase'
+//      }
+//      IT {
+//        baseClass 'org.elasticsearch.gradle.internal.test.GradleIntegrationTestCase'
+//      }
+//    }
+//  }
 
   tasks.register("integTest", Test) {
     inputs.dir(file("src/testKit")).withPropertyName("testkit dir").withPathSensitivity(PathSensitivity.RELATIVE)
@@ -260,11 +402,11 @@ if (project != rootProject) {
     maxParallelForks = providers.systemProperty('tests.jvms').forUseAtConfigurationTime().getOrElse(org.elasticsearch.gradle.internal.info.BuildParams.defaultParallel.toString()) as Integer
   }
 
-  publishing.publications.named("elastic").configure {
-    suppressPomMetadataWarningsFor("testFixturesApiElements")
-    suppressPomMetadataWarningsFor("testFixturesRuntimeElements")
-  }
-}
+//  publishing.publications.named("elastic").configure {
+//    suppressPomMetadataWarningsFor("testFixturesApiElements")
+//    suppressPomMetadataWarningsFor("testFixturesRuntimeElements")
+//  }
+//}
 
 // Define this here because we need it early.
 class VersionPropertiesLoader {
