@@ -1,0 +1,46 @@
+import org.elasticsearch.gradle.internal.test.RestIntegTestTask
+
+apply plugin: 'elasticsearch.internal-testclusters'
+apply plugin: 'elasticsearch.standalone-rest-test'
+apply plugin: 'elasticsearch.rest-test'
+
+dependencies {
+  testImplementation project(path: xpackModule('eql:qa:common'))
+}
+
+testClusters {
+  'remote-cluster' {
+    testDistribution = 'DEFAULT'
+    numberOfNodes = 2
+    setting 'node.roles', '[data,ingest,master]'
+    setting 'xpack.security.enabled', 'false'
+    setting 'xpack.ml.enabled', 'false'
+    setting 'xpack.watcher.enabled', 'false'
+  }
+
+  'local-cluster' {
+    testDistribution = 'DEFAULT'
+    setting 'xpack.security.enabled', 'false'
+    setting 'xpack.ml.enabled', 'false'
+    setting 'xpack.watcher.enabled', 'false'
+    setting 'cluster.remote.my_remote_cluster.seeds', {
+      testClusters.'remote-cluster'.getAllTransportPortURI().collect { "\"$it\"" }.toString()
+    }
+    setting 'cluster.remote.connections_per_cluster', "1"
+  }
+}
+
+tasks.register('remote-cluster', RestIntegTestTask) {
+  mustRunAfter("precommit")
+  systemProperty 'tests.rest.suite', 'remote_cluster'
+}
+
+
+tasks.register('local-cluster', RestIntegTestTask) {
+  dependsOn 'remote-cluster'
+  useCluster testClusters.'remote-cluster'
+  systemProperty 'tests.rest.suite', 'multi_cluster'
+}
+
+tasks.named("integTest").configure { dependsOn("local-cluster") }
+tasks.named("check").configure{dependsOn("integTest") } // run these tests as part of the "check" task
