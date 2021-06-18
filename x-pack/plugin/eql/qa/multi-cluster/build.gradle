@@ -1,4 +1,5 @@
 import org.elasticsearch.gradle.internal.test.RestIntegTestTask
+import org.elasticsearch.gradle.testclusters.DefaultTestClustersTask
 
 apply plugin: 'elasticsearch.internal-testclusters'
 apply plugin: 'elasticsearch.standalone-rest-test'
@@ -18,7 +19,7 @@ testClusters {
     setting 'xpack.watcher.enabled', 'false'
   }
 
-  'local-cluster' {
+  'integTest' {
     testDistribution = 'DEFAULT'
     setting 'xpack.security.enabled', 'false'
     setting 'xpack.ml.enabled', 'false'
@@ -30,17 +31,16 @@ testClusters {
   }
 }
 
-tasks.register('remote-cluster', RestIntegTestTask) {
-  mustRunAfter("precommit")
-  systemProperty 'tests.rest.suite', 'remote_cluster'
+tasks.register("startRemoteCluster", DefaultTestClustersTask.class) {
+  useCluster testClusters.'remote-cluster'
+  doLast {
+    "Starting remote cluster before integ tests and integTest clustser is started"
+  }
 }
 
-
-tasks.register('local-cluster', RestIntegTestTask) {
-  dependsOn 'remote-cluster'
+tasks.named("integTest").configure {
+  dependsOn 'startRemoteCluster'
   useCluster testClusters.'remote-cluster'
   systemProperty 'tests.rest.suite', 'multi_cluster'
 }
-
-tasks.named("integTest").configure { dependsOn("local-cluster") }
 tasks.named("check").configure{dependsOn("integTest") } // run these tests as part of the "check" task
