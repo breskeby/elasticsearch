@@ -14,7 +14,6 @@ import org.elasticsearch.gradle.internal.test.SimpleCommandLineArgumentProvider;
 import org.elasticsearch.gradle.test.GradleTestPolicySetupPlugin;
 import org.elasticsearch.gradle.test.SystemPropertyCommandLineArgumentProvider;
 import org.elasticsearch.gradle.internal.info.BuildParams;
-import org.elasticsearch.gradle.internal.info.GlobalBuildInfoPlugin;
 import org.elasticsearch.gradle.internal.test.ErrorReportingTestListener;
 import org.elasticsearch.gradle.internal.conventions.util.Util;
 import org.gradle.api.Action;
@@ -42,8 +41,6 @@ public class ElasticsearchTestBasePlugin implements Plugin<Project> {
     @Override
     public void apply(Project project) {
         project.getPluginManager().apply(GradleTestPolicySetupPlugin.class);
-        // for fips mode check
-        project.getRootProject().getPluginManager().apply(GlobalBuildInfoPlugin.class);
         // Default test task should run only unit tests
         maybeConfigure(project.getTasks(), "test", Test.class, task -> task.include("**/*Tests.class"));
 

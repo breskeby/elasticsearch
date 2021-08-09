@@ -50,7 +50,6 @@ public class InternalDistributionBwcSetupPlugin implements InternalPlugin {
 
     @Override
     public void apply(Project project) {
-        project.getRootProject().getPluginManager().apply(GlobalBuildInfoPlugin.class);
         Provider<BwcTaskThrottle> bwcTaskThrottleProvider = project.getGradle()
             .getSharedServices()
             .registerIfAbsent(BWC_TASK_THROTTLE_SERVICE, BwcTaskThrottle.class, spec -> spec.getMaxParallelUsages().set(1));

@@ -9,7 +9,6 @@ package org.elasticsearch.gradle.internal.info;
 
 import org.apache.commons.io.IOUtils;
 import org.elasticsearch.gradle.internal.BwcVersions;
-import org.elasticsearch.gradle.OS;
 import org.elasticsearch.gradle.internal.conventions.info.GitInfo;
 import org.elasticsearch.gradle.internal.conventions.info.ParallelDetector;
 import org.elasticsearch.gradle.internal.conventions.util.Util;
@@ -27,15 +26,13 @@ import org.gradle.internal.jvm.inspection.JvmMetadataDetector;
 import org.gradle.internal.jvm.inspection.JvmVendor;
 import org.gradle.jvm.toolchain.internal.InstallationLocation;
 import org.gradle.jvm.toolchain.internal.JavaInstallationRegistry;
+import org.gradle.process.ExecOperations;
 import org.gradle.util.GradleVersion;
-import org.jetbrains.annotations.NotNull;
 
 import javax.inject.Inject;
 import java.io.BufferedReader;
-import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.FileInputStream;
-import java.io.FileReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.UncheckedIOException;
@@ -43,10 +40,8 @@ import java.nio.file.Files;
 import java.time.ZoneOffset;
 import java.time.ZonedDateTime;
 import java.util.Arrays;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
-import java.util.Map;
 import java.util.Random;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
@@ -54,21 +49,23 @@ import java.util.stream.Stream;
 public class GlobalBuildInfoPlugin implements Plugin<Project> {
     private static final Logger LOGGER = Logging.getLogger(GlobalBuildInfoPlugin.class);
     private static final String DEFAULT_VERSION_JAVA_FILE_PATH = "server/src/main/java/org/elasticsearch/Version.java";
-    private static Integer _defaultParallel = null;
 
     private final JavaInstallationRegistry javaInstallationRegistry;
     private final JvmMetadataDetector metadataDetector;
     private final ProviderFactory providers;
+    private final ExecOperations execOperations;
 
     @Inject
     public GlobalBuildInfoPlugin(
         JavaInstallationRegistry javaInstallationRegistry,
         JvmMetadataDetector metadataDetector,
-        ProviderFactory providers
+        ProviderFactory providers,
+        ExecOperations execOperations
     ) {
         this.javaInstallationRegistry = javaInstallationRegistry;
         this.metadataDetector = metadataDetector;
         this.providers = providers;
+        this.execOperations = execOperations;
     }
 
     @Override
@@ -87,7 +84,10 @@ public class GlobalBuildInfoPlugin implements Plugin<Project> {
         File runtimeJavaHome = findRuntimeJavaHome();
 
         File rootDir = project.getRootDir();
-        GitInfo gitInfo = GitInfo.gitInfo(rootDir);
+
+        Provider<GitInfo> gitInfoProvider = providers.provider(() -> GitInfo.gitInfo(rootDir));
+        Provider<String> gitRevisionProvider = gitInfoProvider.forUseAtConfigurationTime().map(gitInfo -> gitInfo.getRevision());
+        Provider<String> gitOriginProvider = gitInfoProvider.forUseAtConfigurationTime().map(gitInfo -> gitInfo.getOrigin());
 
         BuildParams.init(params -> {
             params.reset();
@@ -100,12 +100,12 @@ public class GlobalBuildInfoPlugin implements Plugin<Project> {
             params.setMinimumCompilerVersion(minimumCompilerVersion);
             params.setMinimumRuntimeVersion(minimumRuntimeVersion);
             params.setGradleJavaVersion(Jvm.current().getJavaVersion());
-            params.setGitRevision(gitInfo.getRevision());
-            params.setGitOrigin(gitInfo.getOrigin());
+            params.setGitRevision(gitRevisionProvider);
+            params.setGitOrigin(gitOriginProvider);
             params.setBuildDate(ZonedDateTime.now(ZoneOffset.UTC));
-            params.setTestSeed(getTestSeed());
-            params.setIsCi(System.getenv("JENKINS_URL") != null);
-            params.setDefaultParallel(ParallelDetector.findDefaultParallel(project));
+            params.setTestSeed(getTestSeed(providers));
+            params.setIsCi(providers.environmentVariable("JENKINS_URL").forUseAtConfigurationTime().isPresent());
+            params.setDefaultParallel(ParallelDetector.findDefaultParallel(execOperations, providers));
             params.setInFipsJvm(Util.getBooleanProperty("tests.fips.enabled", false));
             params.setIsSnapshotBuild(Util.getBooleanProperty("build.snapshot", true));
             params.setBwcVersions(providers.provider(() -> resolveBwcVersions(rootDir)));
@@ -214,8 +214,8 @@ public class GlobalBuildInfoPlugin implements Plugin<Project> {
         );
     }
 
-    private static String getTestSeed() {
-        String testSeedProperty = System.getProperty("tests.seed");
+    private static String getTestSeed(ProviderFactory providers) {
+        String testSeedProperty = providers.systemProperty("tests.seed").forUseAtConfigurationTime().getOrNull();
         final String testSeed;
         if (testSeedProperty == null) {
             long seed = new Random(System.currentTimeMillis()).nextLong();
@@ -255,7 +255,8 @@ public class GlobalBuildInfoPlugin implements Plugin<Project> {
             return new File(findJavaHome(runtimeJavaProperty));
         }
 
-        return System.getenv("RUNTIME_JAVA_HOME") == null ? Jvm.current().getJavaHome() : new File(System.getenv("RUNTIME_JAVA_HOME"));
+        Provider<String> runtimeJavaHomeProvider = providers.environmentVariable("RUNTIME_JAVA_HOME").forUseAtConfigurationTime();
+        return runtimeJavaHomeProvider.isPresent() == false ? Jvm.current().getJavaHome() : new File(runtimeJavaHomeProvider.get());
     }
 
     private String findJavaHome(String version) {
@@ -294,57 +295,6 @@ public class GlobalBuildInfoPlugin implements Plugin<Project> {
     private static String getJavaHomeEnvVarName(String version) {
         return "JAVA" + version + "_HOME";
     }
-
-    private static int findDefaultParallel(Project project) {
-        // Since it costs IO to compute this, and is done at configuration time we want to cache this if possible
-        // It's safe to store this in a static variable since it's just a primitive so leaking memory isn't an issue
-        if (_defaultParallel == null) {
-            File cpuInfoFile = new File("/proc/cpuinfo");
-            if (cpuInfoFile.exists()) {
-                // Count physical cores on any Linux distro ( don't count hyper-threading )
-                Map<String, Integer> socketToCore = new HashMap<>();
-                String currentID = "";
-
-                try (BufferedReader reader = new BufferedReader(new FileReader(cpuInfoFile))) {
-                    for (String line = reader.readLine(); line != null; line = reader.readLine()) {
-                        if (line.contains(":")) {
-                            List<String> parts = Arrays.stream(line.split(":", 2)).map(String::trim).collect(Collectors.toList());
-                            String name = parts.get(0);
-                            String value = parts.get(1);
-                            // the ID of the CPU socket
-                            if (name.equals("physical id")) {
-                                currentID = value;
-                            }
-                            // Number of cores not including hyper-threading
-                            if (name.equals("cpu cores")) {
-                                assert currentID.isEmpty() == false;
-                                socketToCore.put("currentID", Integer.valueOf(value));
-                                currentID = "";
-                            }
-                        }
-                    }
-                } catch (IOException e) {
-                    throw new UncheckedIOException(e);
-                }
-                _defaultParallel = socketToCore.values().stream().mapToInt(i -> i).sum();
-            } else if (OS.current() == OS.MAC) {
-                // Ask macOS to count physical CPUs for us
-                ByteArrayOutputStream stdout = new ByteArrayOutputStream();
-                project.exec(spec -> {
-                    spec.setExecutable("sysctl");
-                    spec.args("-n", "hw.physicalcpu");
-                    spec.setStandardOutput(stdout);
-                });
-
-                _defaultParallel = Integer.parseInt(stdout.toString().trim());
-            }
-
-            _defaultParallel = Runtime.getRuntime().availableProcessors() / 2;
-        }
-
-        return _defaultParallel;
-    }
-
 
     public static String getResourceContents(String resourcePath) {
         try (

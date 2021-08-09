@@ -41,9 +41,6 @@ public class InternalDistributionDownloadPlugin implements InternalPlugin {
 
     @Override
     public void apply(Project project) {
-        // this is needed for isInternal
-        project.getRootProject().getPluginManager().apply(GlobalBuildInfoPlugin.class);
-        project.getRootProject().getPluginManager().apply(DockerSupportPlugin.class);
         DistributionDownloadPlugin distributionDownloadPlugin = project.getPlugins().apply(DistributionDownloadPlugin.class);
         Provider<DockerSupportService> dockerSupport = GradleUtils.getBuildService(
             project.getGradle().getSharedServices(),

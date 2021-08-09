@@ -30,8 +30,8 @@ public class BuildParams {
     private static JavaVersion runtimeJavaVersion;
     private static String runtimeJavaDetails;
     private static Boolean inFipsJvm;
-    private static String gitRevision;
-    private static String gitOrigin;
+    private static Provider<String> gitRevision;
+    private static Provider<String> gitOrigin;
     private static ZonedDateTime buildDate;
     private static String testSeed;
     private static Boolean isCi;
@@ -88,11 +88,11 @@ public class BuildParams {
     }
 
     public static String getGitRevision() {
-        return value(gitRevision);
+        return value(gitRevision).get();
     }
 
     public static String getGitOrigin() {
-        return value(gitOrigin);
+        return value(gitOrigin).get();
     }
 
     public static ZonedDateTime getBuildDate() {
@@ -196,11 +196,11 @@ public class BuildParams {
             BuildParams.inFipsJvm = inFipsJvm;
         }
 
-        public void setGitRevision(String gitRevision) {
+        public void setGitRevision(Provider<String> gitRevision) {
             BuildParams.gitRevision = requireNonNull(gitRevision);
         }
 
-        public void setGitOrigin(String gitOrigin) {
+        public void setGitOrigin(Provider<String> gitOrigin) {
             BuildParams.gitOrigin = requireNonNull(gitOrigin);
         }
 

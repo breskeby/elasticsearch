@@ -10,6 +10,7 @@ package org.elasticsearch.gradle.internal.conventions.info;
 
 import org.gradle.api.Project;
 import org.gradle.api.provider.ProviderFactory;
+import org.gradle.process.ExecOperations;
 
 import java.io.BufferedReader;
 import java.io.ByteArrayOutputStream;
@@ -27,7 +28,7 @@ public class ParallelDetector {
 
     private static Integer _defaultParallel = null;
 
-    public static int findDefaultParallel(Project project) {
+    public static int findDefaultParallel(ExecOperations execOperations, ProviderFactory providerFactory) {
         // Since it costs IO to compute this, and is done at configuration time we want to cache this if possible
         // It's safe to store this in a static variable since it's just a primitive so leaking memory isn't an issue
         if (_defaultParallel == null) {
@@ -59,10 +60,10 @@ public class ParallelDetector {
                     throw new UncheckedIOException(e);
                 }
                 _defaultParallel = socketToCore.values().stream().mapToInt(i -> i).sum();
-            } else if (isMac(project.getProviders())) {
+            } else if (isMac(providerFactory)) {
                 // Ask macOS to count physical CPUs for us
                 ByteArrayOutputStream stdout = new ByteArrayOutputStream();
-                project.exec(spec -> {
+                execOperations.exec(spec -> {
                     spec.setExecutable("sysctl");
                     spec.args("-n", "hw.physicalcpu");
                     spec.setStandardOutput(stdout);

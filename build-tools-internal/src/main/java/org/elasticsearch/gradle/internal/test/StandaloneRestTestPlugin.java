@@ -9,7 +9,6 @@
 package org.elasticsearch.gradle.internal.test;
 
 import org.elasticsearch.gradle.internal.ExportElasticsearchBuildResourcesTask;
-import org.elasticsearch.gradle.internal.info.GlobalBuildInfoPlugin;
 import org.elasticsearch.gradle.internal.precommit.InternalPrecommitTasks;
 import org.elasticsearch.gradle.internal.test.rest.RestTestUtil;
 import org.gradle.api.InvalidUserDataException;
@@ -40,9 +39,7 @@ public class StandaloneRestTestPlugin implements Plugin<Project> {
             );
         }
 
-        project.getRootProject().getPluginManager().apply(GlobalBuildInfoPlugin.class);
         project.getPluginManager().apply(RestTestBasePlugin.class);
-
         project.getTasks().register("buildResources", ExportElasticsearchBuildResourcesTask.class);
 
         // only setup tests to build

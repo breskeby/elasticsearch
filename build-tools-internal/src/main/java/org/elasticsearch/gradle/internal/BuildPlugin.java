@@ -28,9 +28,6 @@ import java.io.File;
 public class BuildPlugin implements Plugin<Project> {
     @Override
     public void apply(final Project project) {
-        // make sure the global build info plugin is applied to the root project
-        project.getRootProject().getPluginManager().apply(GlobalBuildInfoPlugin.class);
-
         if (project.getPluginManager().hasPlugin("elasticsearch.standalone-rest-test")) {
             throw new InvalidUserDataException(
                 "elasticsearch.standalone-test, " + "elasticsearch.standalone-rest-test, and elasticsearch.build are mutually exclusive"

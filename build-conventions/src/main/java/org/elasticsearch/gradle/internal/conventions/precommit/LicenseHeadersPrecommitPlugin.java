@@ -20,6 +20,9 @@ import javax.inject.Inject;
 import java.util.stream.Collectors;
 
 public class LicenseHeadersPrecommitPlugin extends PrecommitPlugin {
+
+    private ProviderFactory providerFactory;
+
     @Inject
     public LicenseHeadersPrecommitPlugin(ProviderFactory providerFactory) {
         this.providerFactory = providerFactory;
@@ -35,6 +38,4 @@ public class LicenseHeadersPrecommitPlugin extends PrecommitPlugin {
             });
         });
     }
-
-    private ProviderFactory providerFactory;
 }
