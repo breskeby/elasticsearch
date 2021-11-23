@@ -43,7 +43,7 @@ public class SearchableSnapshotsSystemIndicesIntegTests extends BaseFrozenSearch
     }
 
     public void testCannotMountSnapshotBlobCacheIndex() throws Exception {
-        executeTest(SearchableSnapshotsConstants.SNAPSHOT_BLOB_CACHE_INDEX, client());
+        executeTest(SearchableSnapshots.SNAPSHOT_BLOB_CACHE_INDEX, client());
     }
 
     private void executeTest(final String indexName, final Client client) throws Exception {
@@ -89,7 +89,7 @@ public class SearchableSnapshotsSystemIndicesIntegTests extends BaseFrozenSearch
 
         @Override
         public Collection<SystemIndexDescriptor> getSystemIndexDescriptors(Settings settings) {
-            return List.of(new SystemIndexDescriptor(INDEX_NAME, "System index for [" + getTestClass().getName() + ']'));
+            return List.of(new SystemIndexDescriptor(INDEX_NAME + "*", "System index for [" + getTestClass().getName() + ']'));
         }
 
         @Override

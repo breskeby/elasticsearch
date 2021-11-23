@@ -9,7 +9,7 @@ package org.elasticsearch.license;
 import org.elasticsearch.action.ActionListener;
 import org.elasticsearch.cluster.service.ClusterService;
 import org.elasticsearch.common.settings.Settings;
-import org.elasticsearch.common.unit.TimeValue;
+import org.elasticsearch.core.TimeValue;
 import org.elasticsearch.plugins.Plugin;
 import org.elasticsearch.protocol.xpack.license.DeleteLicenseRequest;
 import org.elasticsearch.protocol.xpack.license.LicensesStatus;
@@ -94,10 +94,10 @@ public class LicensesManagerServiceTests extends ESSingleNodeTestCase {
 
         // modify content of signed license
         License tamperedLicense = License.builder()
-                .fromLicenseSpec(signedLicense, signedLicense.signature())
-                .expiryDate(signedLicense.expiryDate() + 10 * 24 * 60 * 60 * 1000L)
-                .validate()
-                .build();
+            .fromLicenseSpec(signedLicense, signedLicense.signature())
+            .expiryDate(signedLicense.expiryDate() + 10 * 24 * 60 * 60 * 1000L)
+            .validate()
+            .build();
 
         TestUtils.registerAndAckSignedLicenses(licenseService, tamperedLicense, LicensesStatus.INVALID);
 

@@ -15,12 +15,13 @@ import org.apache.lucene.search.ConstantScoreScorer;
 import org.apache.lucene.search.ConstantScoreWeight;
 import org.apache.lucene.search.IndexSearcher;
 import org.apache.lucene.search.Query;
+import org.apache.lucene.search.QueryVisitor;
 import org.apache.lucene.search.ScoreMode;
 import org.apache.lucene.search.Scorer;
 import org.apache.lucene.search.TwoPhaseIterator;
 import org.apache.lucene.search.Weight;
-import org.apache.lucene.store.ByteArrayDataInput;
 import org.apache.lucene.util.BytesRef;
+import org.elasticsearch.common.io.stream.ByteArrayStreamInput;
 import org.elasticsearch.index.mapper.RangeType;
 
 import java.io.IOException;
@@ -36,9 +37,15 @@ public final class BinaryDocValuesRangeQuery extends Query {
     private final Object originalFrom;
     private final Object originalTo;
 
-    public BinaryDocValuesRangeQuery(String fieldName, QueryType queryType, RangeType.LengthType lengthType,
-                                     BytesRef from, BytesRef to,
-                                     Object originalFrom, Object originalTo) {
+    public BinaryDocValuesRangeQuery(
+        String fieldName,
+        QueryType queryType,
+        RangeType.LengthType lengthType,
+        BytesRef from,
+        BytesRef to,
+        Object originalFrom,
+        Object originalTo
+    ) {
         this.fieldName = fieldName;
         this.queryType = queryType;
         this.lengthType = lengthType;
@@ -61,7 +68,7 @@ public final class BinaryDocValuesRangeQuery extends Query {
 
                 final TwoPhaseIterator iterator = new TwoPhaseIterator(values) {
 
-                    ByteArrayDataInput in = new ByteArrayDataInput();
+                    ByteArrayStreamInput in = new ByteArrayStreamInput();
                     BytesRef otherFrom = new BytesRef();
                     BytesRef otherTo = new BytesRef();
 
@@ -109,6 +116,13 @@ public final class BinaryDocValuesRangeQuery extends Query {
     }
 
     @Override
+    public void visit(QueryVisitor visitor) {
+        if (visitor.acceptField(fieldName)) {
+            visitor.visitLeaf(this);
+        }
+    }
+
+    @Override
     public String toString(String field) {
         return "BinaryDocValuesRangeQuery(fieldName=" + field + ",from=" + originalFrom + ",to=" + originalTo + ")";
     }
@@ -116,18 +130,18 @@ public final class BinaryDocValuesRangeQuery extends Query {
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;
-        if (o == null || getClass() != o.getClass()) return false;
+        if (sameClassAs(o) == false) return false;
         BinaryDocValuesRangeQuery that = (BinaryDocValuesRangeQuery) o;
-        return Objects.equals(fieldName, that.fieldName) &&
-                queryType == that.queryType &&
-                lengthType == that.lengthType &&
-                Objects.equals(from, that.from) &&
-                Objects.equals(to, that.to);
+        return Objects.equals(fieldName, that.fieldName)
+            && queryType == that.queryType
+            && lengthType == that.lengthType
+            && Objects.equals(from, that.from)
+            && Objects.equals(to, that.to);
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(getClass(), fieldName, queryType, lengthType, from, to);
+        return Objects.hash(classHash(), fieldName, queryType, lengthType, from, to);
     }
 
     public enum QueryType {
@@ -141,7 +155,8 @@ public final class BinaryDocValuesRangeQuery extends Query {
                  */
                 return from.compareTo(otherTo) <= 0 && to.compareTo(otherFrom) >= 0;
             }
-        }, WITHIN {
+        },
+        WITHIN {
             @Override
             boolean matches(BytesRef from, BytesRef to, BytesRef otherFrom, BytesRef otherTo) {
                 /*
@@ -151,7 +166,8 @@ public final class BinaryDocValuesRangeQuery extends Query {
                  */
                 return from.compareTo(otherFrom) <= 0 && to.compareTo(otherTo) >= 0;
             }
-        }, CONTAINS {
+        },
+        CONTAINS {
             @Override
             boolean matches(BytesRef from, BytesRef to, BytesRef otherFrom, BytesRef otherTo) {
                 /*
@@ -161,12 +177,13 @@ public final class BinaryDocValuesRangeQuery extends Query {
                  */
                 return from.compareTo(otherFrom) >= 0 && to.compareTo(otherTo) <= 0;
             }
-        }, CROSSES {
+        },
+        CROSSES {
             @Override
             boolean matches(BytesRef from, BytesRef to, BytesRef otherFrom, BytesRef otherTo) {
                 // does not disjoint AND not within:
-                return  (from.compareTo(otherTo) > 0 || to.compareTo(otherFrom) < 0) == false &&
-                    (from.compareTo(otherFrom) <= 0 && to.compareTo(otherTo) >= 0) == false;
+                return (from.compareTo(otherTo) > 0 || to.compareTo(otherFrom) < 0) == false
+                    && (from.compareTo(otherFrom) <= 0 && to.compareTo(otherTo) >= 0) == false;
             }
         };
 

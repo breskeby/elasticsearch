@@ -18,7 +18,6 @@ import org.elasticsearch.action.support.TransportAction;
 import org.elasticsearch.client.Cancellable;
 import org.elasticsearch.client.Request;
 import org.elasticsearch.client.Response;
-import org.elasticsearch.client.ResponseListener;
 import org.elasticsearch.client.node.NodeClient;
 import org.elasticsearch.cluster.ClusterState;
 import org.elasticsearch.cluster.metadata.IndexNameExpressionResolver;
@@ -51,14 +50,15 @@ import java.util.List;
 import java.util.concurrent.CancellationException;
 import java.util.concurrent.CountDownLatch;
 
+import static org.elasticsearch.action.support.ActionTestUtils.wrapAsRestResponseListener;
 import static org.elasticsearch.test.TaskAssertions.assertAllCancellableTasksAreCancelled;
 import static org.elasticsearch.test.TaskAssertions.assertAllTasksHaveFinished;
-import static org.elasticsearch.test.TaskAssertions.awaitTaskWithPrefix;
 import static org.hamcrest.core.IsEqual.equalTo;
 
 @ESIntegTestCase.ClusterScope(scope = ESIntegTestCase.Scope.TEST, numDataNodes = 0, numClientNodes = 0)
 public class XPackUsageRestCancellationIT extends ESIntegTestCase {
     private static final CountDownLatch blockActionLatch = new CountDownLatch(1);
+    private static final CountDownLatch blockingXPackUsageActionExecuting = new CountDownLatch(1);
 
     @Override
     protected Collection<Class<? extends Plugin>> nodePlugins() {
@@ -67,8 +67,10 @@ public class XPackUsageRestCancellationIT extends ESIntegTestCase {
 
     @Override
     protected Settings nodeSettings(int ordinal, Settings otherSettings) {
-        return Settings.builder().put(super.nodeSettings(ordinal, otherSettings))
-            .put(NetworkModule.HTTP_DEFAULT_TYPE_SETTING.getKey(), NioTransportPlugin.NIO_HTTP_TRANSPORT_NAME).build();
+        return Settings.builder()
+            .put(super.nodeSettings(ordinal, otherSettings))
+            .put(NetworkModule.HTTP_DEFAULT_TYPE_SETTING.getKey(), NioTransportPlugin.NIO_HTTP_TRANSPORT_NAME)
+            .build();
     }
 
     @Override
@@ -82,22 +84,12 @@ public class XPackUsageRestCancellationIT extends ESIntegTestCase {
         final String actionName = XPackUsageAction.NAME;
 
         final Request request = new Request(HttpGet.METHOD_NAME, "/_xpack/usage");
-        final PlainActionFuture<Void> future = new PlainActionFuture<>();
-        final Cancellable cancellable = getRestClient().performRequestAsync(request, new ResponseListener() {
-            @Override
-            public void onSuccess(Response response) {
-                future.onResponse(null);
-            }
-
-            @Override
-            public void onFailure(Exception exception) {
-                future.onFailure(exception);
-            }
-        });
+        final PlainActionFuture<Response> future = new PlainActionFuture<>();
+        final Cancellable cancellable = getRestClient().performRequestAsync(request, wrapAsRestResponseListener(future));
 
         assertThat(future.isDone(), equalTo(false));
-        awaitTaskWithPrefix(actionName);
 
+        blockingXPackUsageActionExecuting.await();
         cancellable.cancel();
         assertAllCancellableTasksAreCancelled(actionName);
 
@@ -110,6 +102,7 @@ public class XPackUsageRestCancellationIT extends ESIntegTestCase {
     public static class BlockingUsageActionXPackPlugin extends LocalStateCompositeXPackPlugin {
         public static final XPackUsageFeatureAction BLOCKING_XPACK_USAGE = new XPackUsageFeatureAction("blocking_xpack_usage");
         public static final XPackUsageFeatureAction NON_BLOCKING_XPACK_USAGE = new XPackUsageFeatureAction("regular_xpack_usage");
+
         public BlockingUsageActionXPackPlugin(Settings settings, Path configPath) {
             super(settings, configPath);
         }
@@ -121,8 +114,7 @@ public class XPackUsageRestCancellationIT extends ESIntegTestCase {
 
         @Override
         public List<ActionHandler<? extends ActionRequest, ? extends ActionResponse>> getActions() {
-            final ArrayList<ActionHandler<? extends ActionRequest, ? extends ActionResponse>> actions =
-                new ArrayList<>(super.getActions());
+            final ArrayList<ActionHandler<? extends ActionRequest, ? extends ActionResponse>> actions = new ArrayList<>(super.getActions());
             actions.add(new ActionHandler<>(BLOCKING_XPACK_USAGE, BlockingXPackUsageAction.class));
             actions.add(new ActionHandler<>(NON_BLOCKING_XPACK_USAGE, NonBlockingXPackUsageAction.class));
             return actions;
@@ -131,12 +123,14 @@ public class XPackUsageRestCancellationIT extends ESIntegTestCase {
 
     public static class ClusterBlockAwareTransportXPackUsageAction extends TransportXPackUsageAction {
         @Inject
-        public ClusterBlockAwareTransportXPackUsageAction(ThreadPool threadPool,
-                                                          TransportService transportService,
-                                                          ClusterService clusterService,
-                                                          ActionFilters actionFilters,
-                                                          IndexNameExpressionResolver indexNameExpressionResolver,
-                                                          NodeClient client) {
+        public ClusterBlockAwareTransportXPackUsageAction(
+            ThreadPool threadPool,
+            TransportService transportService,
+            ClusterService clusterService,
+            ActionFilters actionFilters,
+            IndexNameExpressionResolver indexNameExpressionResolver,
+            NodeClient client
+        ) {
             super(threadPool, transportService, clusterService, actionFilters, indexNameExpressionResolver, client);
         }
 
@@ -168,10 +162,13 @@ public class XPackUsageRestCancellationIT extends ESIntegTestCase {
         }
 
         @Override
-        protected void masterOperation(Task task,
-                                       XPackUsageRequest request,
-                                       ClusterState state,
-                                       ActionListener<XPackUsageFeatureResponse> listener) throws Exception {
+        protected void masterOperation(
+            Task task,
+            XPackUsageRequest request,
+            ClusterState state,
+            ActionListener<XPackUsageFeatureResponse> listener
+        ) throws Exception {
+            blockingXPackUsageActionExecuting.countDown();
             blockActionLatch.await();
             listener.onResponse(new XPackUsageFeatureResponse(new XPackFeatureSet.Usage("test", false, false) {
                 @Override
@@ -204,10 +201,12 @@ public class XPackUsageRestCancellationIT extends ESIntegTestCase {
         }
 
         @Override
-        protected void masterOperation(Task task,
-                                       XPackUsageRequest request,
-                                       ClusterState state,
-                                       ActionListener<XPackUsageFeatureResponse> listener) {
+        protected void masterOperation(
+            Task task,
+            XPackUsageRequest request,
+            ClusterState state,
+            ActionListener<XPackUsageFeatureResponse> listener
+        ) {
             assert false : "Unexpected execution";
         }
     }

@@ -29,8 +29,8 @@ import org.elasticsearch.common.UUIDs;
 import org.elasticsearch.common.settings.ClusterSettings;
 import org.elasticsearch.common.settings.Setting;
 import org.elasticsearch.common.settings.Settings;
-import org.elasticsearch.common.unit.TimeValue;
 import org.elasticsearch.common.util.set.Sets;
+import org.elasticsearch.core.TimeValue;
 import org.elasticsearch.monitor.os.OsStats;
 import org.elasticsearch.test.client.NoOpClient;
 import org.elasticsearch.xpack.autoscaling.AutoscalingMetadata;
@@ -331,7 +331,7 @@ public class AutoscalingMemoryInfoServiceTests extends AutoscalingTestCase {
             n -> {
                 assertThat(
                     service.snapshot().get(n),
-                    equalTo(response.getNodesMap().get(n.getId()).getOs().getMem().getTotal().getBytes())
+                    equalTo(response.getNodesMap().get(n.getId()).getOs().getMem().getAdjustedTotal().getBytes())
                 );
             }
         );
@@ -347,7 +347,7 @@ public class AutoscalingMemoryInfoServiceTests extends AutoscalingTestCase {
         OsStats osStats = new OsStats(
             randomNonNegativeLong(),
             new OsStats.Cpu(randomShort(), null),
-            new OsStats.Mem(memory, randomLongBetween(0, memory)),
+            new OsStats.Mem(memory, randomLongBetween(0, memory), randomLongBetween(0, memory)),
             new OsStats.Swap(randomNonNegativeLong(), randomNonNegativeLong()),
             null
         );
@@ -356,6 +356,7 @@ public class AutoscalingMemoryInfoServiceTests extends AutoscalingTestCase {
             randomNonNegativeLong(),
             null,
             osStats,
+            null,
             null,
             null,
             null,

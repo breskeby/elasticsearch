@@ -291,8 +291,8 @@ public class DecorationToXContent {
             builder.endArray();
         }
 
-        builder.field("factoryMethodType");
-        ToXContent(ref.factoryMethodType, builder);
+        builder.field("factoryMethodDescriptor", ref.getFactoryMethodDescriptor());
+
         builder.endObject();
     }
 
@@ -341,7 +341,7 @@ public class DecorationToXContent {
     }
 
     public static void ToXContent(Decoration decoration, XContentBuilderWrapper builder) {
-        if  (decoration instanceof TargetType) {
+        if (decoration instanceof TargetType) {
             ToXContent((TargetType) decoration, builder);
         } else if (decoration instanceof ValueType) {
             ToXContent((ValueType) decoration, builder);

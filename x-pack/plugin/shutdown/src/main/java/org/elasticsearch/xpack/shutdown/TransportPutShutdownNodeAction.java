@@ -24,14 +24,12 @@ import org.elasticsearch.cluster.metadata.NodesShutdownMetadata;
 import org.elasticsearch.cluster.metadata.SingleNodeShutdownMetadata;
 import org.elasticsearch.cluster.service.ClusterService;
 import org.elasticsearch.common.Priority;
-import org.elasticsearch.common.Strings;
 import org.elasticsearch.common.inject.Inject;
 import org.elasticsearch.tasks.Task;
 import org.elasticsearch.threadpool.ThreadPool;
 import org.elasticsearch.transport.TransportService;
 
 import java.util.HashMap;
-import java.util.Objects;
 
 public class TransportPutShutdownNodeAction extends AcknowledgedTransportMasterNodeAction<PutShutdownNodeAction.Request> {
     private static final Logger logger = LogManager.getLogger(TransportPutShutdownNodeAction.class);
@@ -71,18 +69,25 @@ public class TransportPutShutdownNodeAction extends AcknowledgedTransportMasterN
                     currentShutdownMetadata = new NodesShutdownMetadata(new HashMap<>());
                 }
 
-                // Verify that there's not already a shutdown metadata for this node
-                if (Objects.nonNull(currentShutdownMetadata.getAllNodeMetadataMap().get(request.getNodeId()))) {
-                    logger.error(Strings.toString(currentShutdownMetadata));
-                    throw new IllegalArgumentException("node [" + request.getNodeId() + "] is already shutting down");
-                }
+                final boolean nodeSeen = currentState.getNodes().nodeExists(request.getNodeId());
 
                 SingleNodeShutdownMetadata newNodeMetadata = SingleNodeShutdownMetadata.builder()
                     .setNodeId(request.getNodeId())
                     .setType(request.getType())
                     .setReason(request.getReason())
                     .setStartedAtMillis(System.currentTimeMillis())
+                    .setNodeSeen(nodeSeen)
+                    .setAllocationDelay(request.getAllocationDelay())
+                    .setTargetNodeName(request.getTargetNodeName())
                     .build();
+
+                // Verify that there's not already a shutdown metadata for this node
+                SingleNodeShutdownMetadata existingRecord = currentShutdownMetadata.getAllNodeMetadataMap().get(request.getNodeId());
+                if (existingRecord != null) {
+                    logger.info("updating existing shutdown record {} with new record {}", existingRecord, newNodeMetadata);
+                } else {
+                    logger.info("creating shutdown record {}", newNodeMetadata);
+                }
 
                 return ClusterState.builder(currentState)
                     .metadata(
@@ -100,7 +105,8 @@ public class TransportPutShutdownNodeAction extends AcknowledgedTransportMasterN
 
             @Override
             public void clusterStateProcessed(String source, ClusterState oldState, ClusterState newState) {
-                if (SingleNodeShutdownMetadata.Type.REMOVE.equals(request.getType())) {
+                if (SingleNodeShutdownMetadata.Type.REMOVE.equals(request.getType())
+                    || SingleNodeShutdownMetadata.Type.REPLACE.equals(request.getType())) {
                     clusterService.getRerouteService()
                         .reroute("node registered for removal from cluster", Priority.NORMAL, new ActionListener<ClusterState>() {
                             @Override

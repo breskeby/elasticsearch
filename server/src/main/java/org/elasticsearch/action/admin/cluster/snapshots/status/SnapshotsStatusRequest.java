@@ -18,6 +18,7 @@ import org.elasticsearch.tasks.Task;
 import org.elasticsearch.tasks.TaskId;
 
 import java.io.IOException;
+import java.util.Arrays;
 import java.util.Map;
 
 import static org.elasticsearch.action.ValidateActions.addValidationError;
@@ -33,8 +34,7 @@ public class SnapshotsStatusRequest extends MasterNodeRequest<SnapshotsStatusReq
 
     private boolean ignoreUnavailable;
 
-    public SnapshotsStatusRequest() {
-    }
+    public SnapshotsStatusRequest() {}
 
     /**
      * Constructs a new get snapshots request with given repository name and list of snapshots
@@ -146,5 +146,13 @@ public class SnapshotsStatusRequest extends MasterNodeRequest<SnapshotsStatusReq
      */
     public boolean ignoreUnavailable() {
         return ignoreUnavailable;
+    }
+
+    @Override
+    public String getDescription() {
+        final StringBuilder stringBuilder = new StringBuilder("repository[").append(repository).append("], snapshots[");
+        Strings.collectionToDelimitedStringWithLimit(Arrays.asList(snapshots), ",", "", "", 1024, stringBuilder);
+        stringBuilder.append("]");
+        return stringBuilder.toString();
     }
 }

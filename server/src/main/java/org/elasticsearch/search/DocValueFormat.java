@@ -101,7 +101,7 @@ public interface DocValueFormat extends NamedWriteable {
 
         public static final DocValueFormat INSTANCE = new RawDocValueFormat();
 
-        private RawDocValueFormat() { }
+        private RawDocValueFormat() {}
 
         @Override
         public String getWriteableName() {
@@ -109,8 +109,7 @@ public interface DocValueFormat extends NamedWriteable {
         }
 
         @Override
-        public void writeTo(StreamOutput out) {
-        }
+        public void writeTo(StreamOutput out) {}
 
         @Override
         public Long format(long value) {
@@ -181,13 +180,11 @@ public interface DocValueFormat extends NamedWriteable {
         }
 
         @Override
-        public void writeTo(StreamOutput out) {
-        }
+        public void writeTo(StreamOutput out) {}
 
         @Override
         public String format(BytesRef value) {
-            return Base64.getEncoder()
-                    .encodeToString(Arrays.copyOfRange(value.bytes, value.offset, value.offset + value.length));
+            return Base64.getEncoder().encodeToString(Arrays.copyOfRange(value.bytes, value.offset, value.offset + value.length));
         }
 
         @Override
@@ -199,8 +196,7 @@ public interface DocValueFormat extends NamedWriteable {
     static DocValueFormat withNanosecondResolution(final DocValueFormat format) {
         if (format instanceof DateTime) {
             DateTime dateTime = (DateTime) format;
-            return new DateTime(dateTime.formatter, dateTime.timeZone, DateFieldMapper.Resolution.NANOSECONDS,
-                dateTime.formatSortValues);
+            return new DateTime(dateTime.formatter, dateTime.timeZone, DateFieldMapper.Resolution.NANOSECONDS, dateTime.formatSortValues);
         } else {
             throw new IllegalArgumentException("trying to convert a known date time formatter to a nanosecond one, wrong field used?");
         }
@@ -229,18 +225,19 @@ public interface DocValueFormat extends NamedWriteable {
         }
 
         private DateTime(DateFormatter formatter, ZoneId timeZone, DateFieldMapper.Resolution resolution, boolean formatSortValues) {
-            this.formatter = formatter;
             this.timeZone = Objects.requireNonNull(timeZone);
-            this.parser = formatter.toDateMathParser();
+            this.formatter = formatter.withZone(timeZone);
+            this.parser = this.formatter.toDateMathParser();
             this.resolution = resolution;
             this.formatSortValues = formatSortValues;
         }
 
         public DateTime(StreamInput in) throws IOException {
-            this.formatter = DateFormatter.forPattern(in.readString());
-            this.parser = formatter.toDateMathParser();
+            String formatterPattern = in.readString();
             String zoneId = in.readString();
             this.timeZone = ZoneId.of(zoneId);
+            this.formatter = DateFormatter.forPattern(formatterPattern).withZone(this.timeZone);
+            this.parser = formatter.toDateMathParser();
             this.resolution = DateFieldMapper.Resolution.ofOrdinal(in.readVInt());
             if (in.getVersion().onOrAfter(Version.V_7_7_0) && in.getVersion().before(Version.V_8_0_0)) {
                 /* when deserialising from 7.7+ nodes expect a flag indicating if a pattern is of joda style
@@ -316,6 +313,26 @@ public interface DocValueFormat extends NamedWriteable {
         public String toString() {
             return "DocValueFormat.DateTime(" + formatter + ", " + timeZone + ", " + resolution + ")";
         }
+
+        @Override
+        public boolean equals(Object o) {
+            if (this == o) {
+                return true;
+            }
+            if (o == null || getClass() != o.getClass()) {
+                return false;
+            }
+            DateTime that = (DateTime) o;
+            return formatter.equals(that.formatter)
+                && timeZone.equals(that.timeZone)
+                && resolution == that.resolution
+                && formatSortValues == that.formatSortValues;
+        }
+
+        @Override
+        public int hashCode() {
+            return Objects.hash(formatter, timeZone, resolution, formatSortValues);
+        }
     }
 
     DocValueFormat GEOHASH = GeoHashDocValueFormat.INSTANCE;
@@ -335,8 +352,7 @@ public interface DocValueFormat extends NamedWriteable {
         }
 
         @Override
-        public void writeTo(StreamOutput out) {
-        }
+        public void writeTo(StreamOutput out) {}
 
         @Override
         public String format(long value) {
@@ -350,6 +366,7 @@ public interface DocValueFormat extends NamedWriteable {
     };
 
     DocValueFormat GEOTILE = GeoTileDocValueFormat.INSTANCE;
+
     class GeoTileDocValueFormat implements DocValueFormat {
 
         public static final DocValueFormat INSTANCE = new GeoTileDocValueFormat();
@@ -362,8 +379,7 @@ public interface DocValueFormat extends NamedWriteable {
         }
 
         @Override
-        public void writeTo(StreamOutput out) {
-        }
+        public void writeTo(StreamOutput out) {}
 
         @Override
         public String format(long value) {
@@ -373,6 +389,11 @@ public interface DocValueFormat extends NamedWriteable {
         @Override
         public String format(double value) {
             return format((long) value);
+        }
+
+        @Override
+        public long parseLong(String value, boolean roundUp, LongSupplier now) {
+            return GeoTileUtils.longEncode(value);
         }
     };
 
@@ -393,8 +414,7 @@ public interface DocValueFormat extends NamedWriteable {
         }
 
         @Override
-        public void writeTo(StreamOutput out) {
-        }
+        public void writeTo(StreamOutput out) {}
 
         @Override
         public Boolean format(long value) {
@@ -409,10 +429,10 @@ public interface DocValueFormat extends NamedWriteable {
         @Override
         public long parseLong(String value, boolean roundUp, LongSupplier now) {
             switch (value) {
-            case "false":
-                return 0;
-            case "true":
-                return 1;
+                case "false":
+                    return 0;
+                case "true":
+                    return 1;
             }
             throw new IllegalArgumentException("Cannot parse boolean [" + value + "], expected either [true] or [false]");
         }
@@ -440,8 +460,7 @@ public interface DocValueFormat extends NamedWriteable {
         }
 
         @Override
-        public void writeTo(StreamOutput out) {
-        }
+        public void writeTo(StreamOutput out) {}
 
         @Override
         public String format(BytesRef value) {
@@ -570,7 +589,8 @@ public interface DocValueFormat extends NamedWriteable {
             return Objects.hash(pattern);
         }
 
-        @Override public String toString() {
+        @Override
+        public String toString() {
             return pattern;
         }
     };
@@ -593,8 +613,7 @@ public interface DocValueFormat extends NamedWriteable {
         }
 
         @Override
-        public void writeTo(StreamOutput out) {
-        }
+        public void writeTo(StreamOutput out) {}
 
         @Override
         public String toString() {

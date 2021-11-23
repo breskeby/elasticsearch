@@ -11,15 +11,15 @@ package org.apache.lucene.search.vectorhighlight;
 import org.apache.lucene.index.IndexReader;
 import org.apache.lucene.index.Term;
 import org.apache.lucene.queries.BlendedTermQuery;
+import org.apache.lucene.queries.spans.SpanTermQuery;
+import org.apache.lucene.sandbox.search.CombinedFieldQuery;
 import org.apache.lucene.search.BoostQuery;
-import org.apache.lucene.search.CombinedFieldQuery;
 import org.apache.lucene.search.ConstantScoreQuery;
 import org.apache.lucene.search.MultiPhraseQuery;
 import org.apache.lucene.search.PhraseQuery;
 import org.apache.lucene.search.Query;
 import org.apache.lucene.search.SynonymQuery;
 import org.apache.lucene.search.TermQuery;
-import org.apache.lucene.search.spans.SpanTermQuery;
 import org.elasticsearch.common.lucene.search.MultiPhrasePrefixQuery;
 import org.elasticsearch.common.lucene.search.function.FunctionScoreQuery;
 import org.elasticsearch.index.search.ESToParentBlockJoinQuery;
@@ -66,7 +66,7 @@ public class CustomFieldQuery extends FieldQuery {
         } else if (sourceQuery instanceof org.apache.lucene.queries.function.FunctionScoreQuery) {
             org.apache.lucene.queries.function.FunctionScoreQuery funcScoreQuery =
                 (org.apache.lucene.queries.function.FunctionScoreQuery) sourceQuery;
-            //flatten query with query boost
+            // flatten query with query boost
             flatten(funcScoreQuery.getWrappedQuery(), reader, flatQueries, boost);
         } else if (sourceQuery instanceof SynonymQuery) {
             // SynonymQuery should be handled by the parent class directly.
@@ -90,8 +90,15 @@ public class CustomFieldQuery extends FieldQuery {
         }
     }
 
-    private void convertMultiPhraseQuery(int currentPos, int[] termsIdx, MultiPhraseQuery orig, Term[][] terms, int[] pos,
-            IndexReader reader, Collection<Query> flatQueries) throws IOException {
+    private void convertMultiPhraseQuery(
+        int currentPos,
+        int[] termsIdx,
+        MultiPhraseQuery orig,
+        Term[][] terms,
+        int[] pos,
+        IndexReader reader,
+        Collection<Query> flatQueries
+    ) throws IOException {
         if (currentPos == 0) {
             // if we have more than 16 terms
             int numTerms = 0;
@@ -123,7 +130,7 @@ public class CustomFieldQuery extends FieldQuery {
             Term[] t = terms[currentPos];
             for (int i = 0; i < t.length; i++) {
                 termsIdx[currentPos] = i;
-                convertMultiPhraseQuery(currentPos+1, termsIdx, orig, terms, pos, reader, flatQueries);
+                convertMultiPhraseQuery(currentPos + 1, termsIdx, orig, terms, pos, reader, flatQueries);
             }
         }
     }

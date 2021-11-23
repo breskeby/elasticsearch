@@ -39,8 +39,6 @@ import static org.elasticsearch.gradle.util.GradleUtils.projectDependency;
  */
 public class InternalDistributionDownloadPlugin implements InternalPlugin {
 
-    private BwcVersions bwcVersions = null;
-
     @Override
     public void apply(Project project) {
         // this is needed for isInternal
@@ -54,7 +52,6 @@ public class InternalDistributionDownloadPlugin implements InternalPlugin {
         distributionDownloadPlugin.setDockerAvailability(
             dockerSupport.map(dockerSupportService -> dockerSupportService.getDockerAvailability().isAvailable)
         );
-        this.bwcVersions = BuildParams.getBwcVersions();
         registerInternalDistributionResolutions(DistributionDownloadPlugin.getRegistrationsContainer(project));
     }
 
@@ -68,7 +65,7 @@ public class InternalDistributionDownloadPlugin implements InternalPlugin {
      */
     private void registerInternalDistributionResolutions(NamedDomainObjectContainer<DistributionResolution> resolutions) {
         resolutions.register("localBuild", distributionResolution -> distributionResolution.setResolver((project, distribution) -> {
-            if (VersionProperties.getElasticsearch().equals(distribution.getVersion())) {
+            if (isCurrentVersion(distribution)) {
                 // non-external project, so depend on local build
                 return new ProjectBasedDistributionDependency(
                     config -> projectDependency(project, distributionProjectPath(distribution), config)
@@ -78,7 +75,8 @@ public class InternalDistributionDownloadPlugin implements InternalPlugin {
         }));
 
         resolutions.register("bwc", distributionResolution -> distributionResolution.setResolver((project, distribution) -> {
-            BwcVersions.UnreleasedVersionInfo unreleasedInfo = bwcVersions.unreleasedInfo(Version.fromString(distribution.getVersion()));
+            BwcVersions.UnreleasedVersionInfo unreleasedInfo = BuildParams.getBwcVersions()
+                .unreleasedInfo(Version.fromString(distribution.getVersion()));
             if (unreleasedInfo != null) {
                 if (distribution.getBundledJdk() == false) {
                     throw new GradleException(
@@ -97,6 +95,12 @@ public class InternalDistributionDownloadPlugin implements InternalPlugin {
         }));
     }
 
+    private boolean isCurrentVersion(ElasticsearchDistribution distribution) {
+        Version currentVersionNumber = Version.fromString(VersionProperties.getElasticsearch());
+        Version parsedDistVersionNumber = Version.fromString(distribution.getVersion());
+        return currentVersionNumber.equals(parsedDistVersionNumber);
+    }
+
     /**
      * Will be removed once this is backported to all unreleased branches.
      */
@@ -109,7 +113,6 @@ public class InternalDistributionDownloadPlugin implements InternalPlugin {
         } else {
             return distributionProjectName;
         }
-
     }
 
     private static String distributionProjectPath(ElasticsearchDistribution distribution) {
@@ -164,6 +167,12 @@ public class InternalDistributionDownloadPlugin implements InternalPlugin {
         }
         if (distribution.getType() == InternalElasticsearchDistributionTypes.DOCKER_IRONBANK) {
             return projectName + "ironbank-docker" + archString + "-export";
+        }
+        if (distribution.getType() == InternalElasticsearchDistributionTypes.DOCKER_CLOUD) {
+            return projectName + "cloud-docker" + archString + "-export";
+        }
+        if (distribution.getType() == InternalElasticsearchDistributionTypes.DOCKER_CLOUD_ESS) {
+            return projectName + "cloud-ess-docker" + archString + "-export";
         }
         return projectName + distribution.getType().getName();
     }

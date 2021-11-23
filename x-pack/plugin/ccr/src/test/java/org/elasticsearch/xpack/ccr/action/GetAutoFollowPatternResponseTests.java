@@ -11,7 +11,7 @@ import org.elasticsearch.common.io.stream.Writeable;
 import org.elasticsearch.common.settings.Settings;
 import org.elasticsearch.common.unit.ByteSizeUnit;
 import org.elasticsearch.common.unit.ByteSizeValue;
-import org.elasticsearch.common.unit.TimeValue;
+import org.elasticsearch.core.TimeValue;
 import org.elasticsearch.test.AbstractWireSerializingTestCase;
 import org.elasticsearch.xpack.core.ccr.AutoFollowMetadata.AutoFollowPattern;
 import org.elasticsearch.xpack.core.ccr.action.GetAutoFollowPatternAction;
@@ -48,7 +48,8 @@ public class GetAutoFollowPatternResponseTests extends AbstractWireSerializingTe
                 randomIntBetween(0, Integer.MAX_VALUE),
                 new ByteSizeValue(randomNonNegativeLong()),
                 TimeValue.timeValueMillis(500),
-                TimeValue.timeValueMillis(500));
+                TimeValue.timeValueMillis(500)
+            );
             patterns.put(randomAlphaOfLength(4), autoFollowPattern);
         }
         return new GetAutoFollowPatternAction.Response(patterns);

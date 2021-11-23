@@ -120,12 +120,8 @@ the `multiplier` parameter without {es} recompiling the script.
 }
 ----
 
-For most contexts, you can compile up to 75 scripts per 5 minutes by default.
-For ingest contexts, the default script compilation rate is unlimited. You
-can change these settings dynamically by setting
-`script.context.$CONTEXT.max_compilations_rate`. For example, the following
-setting limits script compilation to 100 scripts every 10 minutes for the
-{painless}/painless-field-context.html[field context]:
+You can compile up to 150 scripts per 5 minutes by default.
+For ingest contexts, the default script compilation rate is unlimited.
 
 [source,js]
 ----

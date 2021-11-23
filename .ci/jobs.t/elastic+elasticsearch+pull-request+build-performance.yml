@@ -1,0 +1,41 @@
+---
+- job:
+    name: "elastic+elasticsearch+pull-request+build-performance"
+    display-name: "elastic / elasticsearch - pull request build performance"
+    description: "Testing of Elasticsearch pull requests - build performance"
+    workspace: "/dev/shm/elastic+elasticsearch+pull-request+build-perf"
+    scm:
+      - git:
+          refspec: "+refs/pull/${ghprbPullId}/*:refs/remotes/origin/pr/${ghprbPullId}/*"
+          branches:
+            - "introduce-build-benchmark-tests"
+    triggers:
+      - github-pull-request:
+          org-list:
+            - breskeby
+          allow-whitelist-orgs-as-admins: true
+          trigger-phrase: '.*run\W+elasticsearch-ci/build-perf.*'
+          github-hooks: true
+          status-context: elasticsearch-ci/build-performance
+          cancel-builds-on-update: false
+          black-list-target-branches:
+            - 6.8
+          excluded-regions:
+            - ^docs/.*
+          white-list-labels:
+            - 'build-performance'
+          black-list-labels:
+            - '>test-mute'
+    builders:
+      - inject:
+          properties-file: '.ci/java-versions.properties'
+          properties-content: |
+            JAVA_HOME=$HOME/.java/$ES_BUILD_JAVA
+            RUNTIME_JAVA_HOME=$HOME/.java/$ES_RUNTIME_JAVA
+            JAVA8_HOME=$HOME/.java/java8
+            JAVA11_HOME=$HOME/.java/java11
+      - shell: |
+          #!/usr/local/bin/runbld --redirect-stderr
+          $WORKSPACE/.ci/scripts/run-gradle.sh bootstrapPerformanceTests
+          #!/usr/local/bin/runbld --redirect-stderr
+          $WORKSPACE/.ci/scripts/install-gradle-profiler.sh bootstrapPerformanceTests

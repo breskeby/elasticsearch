@@ -44,11 +44,22 @@ public final class AttachmentProcessor extends AbstractProcessor {
     private final Set<Property> properties;
     private final int indexedChars;
     private final boolean ignoreMissing;
+    private final boolean removeBinary;
     private final String indexedCharsField;
     private final String resourceName;
 
-    AttachmentProcessor(String tag, String description, String field, String targetField, Set<Property> properties,
-                        int indexedChars, boolean ignoreMissing, String indexedCharsField, String resourceName) {
+    AttachmentProcessor(
+        String tag,
+        String description,
+        String field,
+        String targetField,
+        Set<Property> properties,
+        int indexedChars,
+        boolean ignoreMissing,
+        String indexedCharsField,
+        String resourceName,
+        boolean removeBinary
+    ) {
         super(tag, description);
         this.field = field;
         this.targetField = targetField;
@@ -57,10 +68,16 @@ public final class AttachmentProcessor extends AbstractProcessor {
         this.ignoreMissing = ignoreMissing;
         this.indexedCharsField = indexedCharsField;
         this.resourceName = resourceName;
+        this.removeBinary = removeBinary;
     }
 
     boolean isIgnoreMissing() {
         return ignoreMissing;
+    }
+
+    // For tests only
+    boolean isRemoveBinary() {
+        return removeBinary;
     }
 
     @Override
@@ -78,14 +95,14 @@ public final class AttachmentProcessor extends AbstractProcessor {
             throw new IllegalArgumentException("field [" + field + "] is null, cannot parse.");
         }
 
-        Integer indexedChars = this.indexedChars;
+        Integer indexedCharsValue = this.indexedChars;
 
         if (indexedCharsField != null) {
             // If the user provided the number of characters to be extracted as part of the document, we use it
-            indexedChars = ingestDocument.getFieldValue(indexedCharsField, Integer.class, true);
-            if (indexedChars == null) {
+            indexedCharsValue = ingestDocument.getFieldValue(indexedCharsField, Integer.class, true);
+            if (indexedCharsValue == null) {
                 // If the field does not exist we fall back to the global limit
-                indexedChars = this.indexedChars;
+                indexedCharsValue = this.indexedChars;
             }
         }
 
@@ -95,7 +112,7 @@ public final class AttachmentProcessor extends AbstractProcessor {
         }
         String parsedContent = "";
         try {
-            parsedContent = TikaImpl.parse(input, metadata, indexedChars);
+            parsedContent = TikaImpl.parse(input, metadata, indexedCharsValue);
         } catch (ZeroByteFileException e) {
             // tika 1.17 throws an exception when the InputStream has 0 bytes.
             // previously, it did not mind. This is here to preserve that behavior.
@@ -162,6 +179,10 @@ public final class AttachmentProcessor extends AbstractProcessor {
         }
 
         ingestDocument.setFieldValue(targetField, additionalFields);
+
+        if (removeBinary) {
+            ingestDocument.removeField(field);
+        }
         return ingestDocument;
     }
 
@@ -191,8 +212,12 @@ public final class AttachmentProcessor extends AbstractProcessor {
         static final Set<Property> DEFAULT_PROPERTIES = EnumSet.allOf(Property.class);
 
         @Override
-        public AttachmentProcessor create(Map<String, Processor.Factory> registry, String processorTag,
-                                          String description, Map<String, Object> config) throws Exception {
+        public AttachmentProcessor create(
+            Map<String, Processor.Factory> registry,
+            String processorTag,
+            String description,
+            Map<String, Object> config
+        ) throws Exception {
             String field = readStringProperty(TYPE, processorTag, config, "field");
             String resourceName = readOptionalStringProperty(TYPE, processorTag, config, "resource_name");
             String targetField = readStringProperty(TYPE, processorTag, config, "target_field", "attachment");
@@ -200,6 +225,7 @@ public final class AttachmentProcessor extends AbstractProcessor {
             int indexedChars = readIntProperty(TYPE, processorTag, config, "indexed_chars", NUMBER_OF_CHARS_INDEXED);
             boolean ignoreMissing = readBooleanProperty(TYPE, processorTag, config, "ignore_missing", false);
             String indexedCharsField = readOptionalStringProperty(TYPE, processorTag, config, "indexed_chars_field");
+            boolean removeBinary = readBooleanProperty(TYPE, processorTag, config, "remove_binary", false);
 
             final Set<Property> properties;
             if (propertyNames != null) {
@@ -208,16 +234,30 @@ public final class AttachmentProcessor extends AbstractProcessor {
                     try {
                         properties.add(Property.parse(fieldName));
                     } catch (Exception e) {
-                        throw newConfigurationException(TYPE, processorTag, "properties", "illegal field option [" +
-                            fieldName + "]. valid values are " + Arrays.toString(Property.values()));
+                        throw newConfigurationException(
+                            TYPE,
+                            processorTag,
+                            "properties",
+                            "illegal field option [" + fieldName + "]. valid values are " + Arrays.toString(Property.values())
+                        );
                     }
                 }
             } else {
                 properties = DEFAULT_PROPERTIES;
             }
 
-            return new AttachmentProcessor(processorTag, description, field, targetField, properties, indexedChars, ignoreMissing,
-                indexedCharsField, resourceName);
+            return new AttachmentProcessor(
+                processorTag,
+                description,
+                field,
+                targetField,
+                properties,
+                indexedChars,
+                ignoreMissing,
+                indexedCharsField,
+                resourceName,
+                removeBinary
+            );
         }
     }
 

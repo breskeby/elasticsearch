@@ -11,8 +11,8 @@ package org.elasticsearch.index.mapper;
 import org.apache.lucene.search.Query;
 import org.elasticsearch.Version;
 import org.elasticsearch.common.Explicit;
-import org.elasticsearch.common.xcontent.XContentBuilder;
 import org.elasticsearch.common.xcontent.support.XContentMapValues;
+import org.elasticsearch.xcontent.XContentBuilder;
 
 import java.io.IOException;
 import java.util.Collections;
@@ -20,6 +20,9 @@ import java.util.Iterator;
 import java.util.Locale;
 import java.util.Map;
 
+/**
+ * A Mapper for nested objects
+ */
 public class NestedObjectMapper extends ObjectMapper {
 
     public static final String CONTENT_TYPE = "nested";
@@ -40,44 +43,21 @@ public class NestedObjectMapper extends ObjectMapper {
             return this;
         }
 
-        void includeInRoot(Explicit<Boolean> includeInRoot) {
-            this.includeInRoot = includeInRoot;
-        }
-
         Builder includeInParent(boolean includeInParent) {
             this.includeInParent = new Explicit<>(includeInParent, true);
             return this;
         }
 
-        void includeInParent(Explicit<Boolean> includeInParent) {
-            this.includeInParent = includeInParent;
-        }
-
         @Override
-        public NestedObjectMapper build(ContentPath contentPath) {
-            fixRedundantIncludes(this, true);
-            return new NestedObjectMapper(name, contentPath.pathAsText(name), buildMappers(contentPath), this);
-        }
-
-        private static void fixRedundantIncludes(ObjectMapper.Builder objectMapper, boolean parentIncluded) {
-            for (Mapper.Builder builder : objectMapper.builders()) {
-                if (builder instanceof NestedObjectMapper.Builder) {
-                    NestedObjectMapper.Builder child = (NestedObjectMapper.Builder) builder;
-                    boolean includeInRootViaParent = parentIncluded && child.includeInParent.value();
-                    boolean includedInRoot = child.includeInRoot.value();
-                    if (includeInRootViaParent && includedInRoot) {
-                        child.includeInParent(true);
-                        child.includeInRoot(false);
-                    }
-                    fixRedundantIncludes(child, includeInRootViaParent || includedInRoot);
-                }
-            }
+        public NestedObjectMapper build(MapperBuilderContext context) {
+            return new NestedObjectMapper(name, context.buildFullName(name), buildMappers(false, context), this);
         }
     }
 
     public static class TypeParser extends ObjectMapper.TypeParser {
         @Override
-        public Mapper.Builder parse(String name, Map<String, Object> node, ParserContext parserContext) throws MapperParsingException {
+        public Mapper.Builder parse(String name, Map<String, Object> node, MappingParserContext parserContext)
+            throws MapperParsingException {
             NestedObjectMapper.Builder builder = new NestedObjectMapper.Builder(name, parserContext.indexVersionCreated());
             parseNested(name, node, builder);
             for (Iterator<Map.Entry<String, Object>> iterator = node.entrySet().iterator(); iterator.hasNext();) {
@@ -107,18 +87,12 @@ public class NestedObjectMapper extends ObjectMapper {
         }
     }
 
-    private final Explicit<Boolean> includeInRoot;
-    private final Explicit<Boolean> includeInParent;
+    private Explicit<Boolean> includeInRoot;
+    private Explicit<Boolean> includeInParent;
     private final String nestedTypePath;
     private final Query nestedTypeFilter;
-    private final Version indexCreatedVersion;
 
-    NestedObjectMapper(
-        String name,
-        String fullPath,
-        Map<String, Mapper> mappers,
-        Builder builder
-    ) {
+    NestedObjectMapper(String name, String fullPath, Map<String, Mapper> mappers, Builder builder) {
         super(name, fullPath, builder.enabled, builder.dynamic, mappers);
         if (builder.indexCreatedVersion.before(Version.V_8_0_0)) {
             this.nestedTypePath = "__" + fullPath;
@@ -128,7 +102,6 @@ public class NestedObjectMapper extends ObjectMapper {
         this.nestedTypeFilter = NestedPathFieldMapper.filter(builder.indexCreatedVersion, nestedTypePath);
         this.includeInParent = builder.includeInParent;
         this.includeInRoot = builder.includeInRoot;
-        this.indexCreatedVersion = builder.indexCreatedVersion;
     }
 
     public Query nestedTypeFilter() {
@@ -148,8 +121,16 @@ public class NestedObjectMapper extends ObjectMapper {
         return this.includeInParent.value();
     }
 
+    public void setIncludeInParent(boolean includeInParent) {
+        this.includeInParent = new Explicit<>(includeInParent, true);
+    }
+
     public boolean isIncludeInRoot() {
         return this.includeInRoot.value();
+    }
+
+    public void setIncludeInRoot(boolean includeInRoot) {
+        this.includeInRoot = new Explicit<>(includeInRoot, true);
     }
 
     public Map<String, Mapper> getChildren() {
@@ -160,10 +141,10 @@ public class NestedObjectMapper extends ObjectMapper {
     public XContentBuilder toXContent(XContentBuilder builder, Params params) throws IOException {
         builder.startObject(simpleName());
         builder.field("type", CONTENT_TYPE);
-        if (includeInParent.explicit()) {
+        if (includeInParent.value()) {
             builder.field("include_in_parent", includeInParent.value());
         }
-        if (includeInRoot.explicit()) {
+        if (includeInRoot.value()) {
             builder.field("include_in_root", includeInRoot.value());
         }
         if (dynamic != null) {
@@ -182,38 +163,23 @@ public class NestedObjectMapper extends ObjectMapper {
             throw new IllegalArgumentException("can't merge a non nested mapping [" + mergeWith.name() + "] with a nested mapping");
         }
         NestedObjectMapper mergeWithObject = (NestedObjectMapper) mergeWith;
-        NestedObjectMapper.Builder builder = new NestedObjectMapper.Builder(simpleName(), indexCreatedVersion);
+        NestedObjectMapper toMerge = (NestedObjectMapper) clone();
+
         if (reason == MapperService.MergeReason.INDEX_TEMPLATE) {
             if (mergeWithObject.includeInParent.explicit()) {
-                builder.includeInParent(mergeWithObject.includeInParent);
+                toMerge.includeInParent = mergeWithObject.includeInParent;
             }
             if (mergeWithObject.includeInRoot.explicit()) {
-                builder.includeInRoot(mergeWithObject.includeInRoot);
+                toMerge.includeInRoot = mergeWithObject.includeInRoot;
             }
         } else {
             if (includeInParent.value() != mergeWithObject.includeInParent.value()) {
                 throw new MapperException("the [include_in_parent] parameter can't be updated on a nested object mapping");
             }
-            builder.includeInParent(includeInParent);
             if (includeInRoot.value() != mergeWithObject.includeInRoot.value()) {
                 throw new MapperException("the [include_in_root] parameter can't be updated on a nested object mapping");
             }
-            builder.includeInRoot(includeInRoot);
         }
-        for (Mapper child : mappers.values()) {
-            builder.add(new Mapper.Builder(child.name()) {
-                @Override
-                public Mapper build(ContentPath contentPath) {
-                    return child;
-                }
-            });
-        }
-        ContentPath contentPath = new ContentPath();
-        int lastDot = this.name().lastIndexOf(".");
-        if (lastDot != -1) {
-            contentPath.add(this.name().substring(0, lastDot));
-        }
-        NestedObjectMapper toMerge = builder.build(contentPath);
         toMerge.doMerge(mergeWithObject, reason);
         return toMerge;
     }

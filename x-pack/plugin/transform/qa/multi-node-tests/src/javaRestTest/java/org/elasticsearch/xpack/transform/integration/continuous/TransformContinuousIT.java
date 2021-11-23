@@ -33,16 +33,16 @@ import org.elasticsearch.client.transform.transforms.TransformConfig;
 import org.elasticsearch.client.transform.transforms.TransformStats;
 import org.elasticsearch.common.Strings;
 import org.elasticsearch.common.bytes.BytesReference;
-import org.elasticsearch.common.collect.Tuple;
 import org.elasticsearch.common.settings.Settings;
-import org.elasticsearch.common.unit.TimeValue;
 import org.elasticsearch.common.util.concurrent.ThreadContext;
-import org.elasticsearch.common.xcontent.NamedXContentRegistry;
-import org.elasticsearch.common.xcontent.XContentBuilder;
-import org.elasticsearch.common.xcontent.XContentType;
 import org.elasticsearch.common.xcontent.support.XContentMapValues;
+import org.elasticsearch.core.TimeValue;
+import org.elasticsearch.core.Tuple;
 import org.elasticsearch.search.SearchModule;
 import org.elasticsearch.test.rest.ESRestTestCase;
+import org.elasticsearch.xcontent.NamedXContentRegistry;
+import org.elasticsearch.xcontent.XContentBuilder;
+import org.elasticsearch.xcontent.XContentType;
 import org.junit.After;
 import org.junit.Before;
 
@@ -63,7 +63,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
-import static org.elasticsearch.common.xcontent.XContentFactory.jsonBuilder;
+import static org.elasticsearch.xcontent.XContentFactory.jsonBuilder;
 import static org.hamcrest.Matchers.containsInRelativeOrder;
 import static org.hamcrest.Matchers.greaterThan;
 import static org.hamcrest.core.Is.is;
@@ -88,7 +88,7 @@ import static org.hamcrest.core.Is.is;
  *       - sync config for continuous mode
  *       - page size 10 to trigger paging
  *       - count field to test how many buckets
- *       - max run field to check what was the hight run field, see below for more details
+ *       - max run field to check what was the highest run field, see below for more details
  *       - a test ingest pipeline
  *    - execute 10 rounds ("run"):
  *      - set run = #round
@@ -106,6 +106,7 @@ import static org.hamcrest.core.Is.is;
  *          to check that optimizations worked
  *      - repeat
  */
+@SuppressWarnings("removal")
 public class TransformContinuousIT extends ESRestTestCase {
 
     private List<ContinuousTestCase> transformTestCases = new ArrayList<>();
@@ -117,7 +118,7 @@ public class TransformContinuousIT extends ESRestTestCase {
         // see: https://github.com/elastic/elasticsearch/issues/45562
         Request addFailureRetrySetting = new Request("PUT", "/_cluster/settings");
         addFailureRetrySetting.setJsonEntity(
-            "{\"transient\": {\"xpack.transform.num_transform_failure_retries\": \""
+            "{\"persistent\": {\"xpack.transform.num_transform_failure_retries\": \""
                 + 0
                 + "\","
                 + "\"logger.org.elasticsearch.action.bulk\": \"info\","
@@ -228,7 +229,7 @@ public class TransformContinuousIT extends ESRestTestCase {
                 Integer metric = metric_bucket.get((numDoc + randomIntBetween(0, 50)) % 50);
                 if (metric != null) {
                     // randomize, but ensure it falls into the same bucket
-                    int randomizedMetric = metric + randomIntBetween(0, 99);
+                    int randomizedMetric = run * ContinuousTestCase.METRIC_TREND + metric + randomIntBetween(0, 99);
                     source.append("\"metric\":").append(randomizedMetric).append(",");
                 }
 
@@ -517,7 +518,7 @@ public class TransformContinuousIT extends ESRestTestCase {
                     stats.getCheckpointingInfo().getLastSearchTime(),
                     greaterThan(waitUntil)
                 );
-            }, 20, TimeUnit.SECONDS);
+            }, 30, TimeUnit.SECONDS);
         }
     }
 

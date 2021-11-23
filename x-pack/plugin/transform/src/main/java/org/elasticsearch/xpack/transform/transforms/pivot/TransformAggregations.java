@@ -7,7 +7,7 @@
 
 package org.elasticsearch.xpack.transform.transforms.pivot;
 
-import org.elasticsearch.common.collect.Tuple;
+import org.elasticsearch.core.Tuple;
 import org.elasticsearch.search.aggregations.AggregationBuilder;
 import org.elasticsearch.search.aggregations.metrics.PercentilesAggregationBuilder;
 import org.elasticsearch.search.aggregations.support.ValuesSourceAggregationBuilder;
@@ -224,20 +224,12 @@ public final class TransformAggregations {
                 outputFieldNames.get()
                     .stream()
                     .collect(
-                        Collectors.toMap(
-                            outputField -> agg.getName() + "." + outputField,
-                            outputField -> outputField,
-                            (v1, v2) -> v1
-                        )
+                        Collectors.toMap(outputField -> agg.getName() + "." + outputField, outputField -> outputField, (v1, v2) -> v1)
                     ),
                 outputFieldNames.get()
                     .stream()
                     .collect(
-                        Collectors.toMap(
-                            outputField -> agg.getName() + "." + outputField,
-                            outputField -> agg.getType(),
-                            (v1, v2) -> v1
-                        )
+                        Collectors.toMap(outputField -> agg.getName() + "." + outputField, outputField -> agg.getType(), (v1, v2) -> v1)
                     )
             );
         }

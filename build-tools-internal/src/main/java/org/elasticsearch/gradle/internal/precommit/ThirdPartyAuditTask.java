@@ -8,6 +8,7 @@
 package org.elasticsearch.gradle.internal.precommit;
 
 import de.thetaphi.forbiddenapis.cli.CliMain;
+
 import org.apache.commons.io.output.NullOutputStream;
 import org.elasticsearch.gradle.OS;
 import org.elasticsearch.gradle.dependencies.CompileOnlyResolvePlugin;
@@ -334,7 +335,7 @@ public class ThirdPartyAuditTask extends DefaultTask {
                 getProject().getConfigurations().getByName(CompileOnlyResolvePlugin.RESOLVEABLE_COMPILE_ONLY_CONFIGURATION_NAME)
             );
             spec.jvmArgs("-Xmx1g");
-            spec.setMain("de.thetaphi.forbiddenapis.cli.CliMain");
+            spec.getMainClass().set("de.thetaphi.forbiddenapis.cli.CliMain");
             spec.args("-f", getSignatureFile().getAbsolutePath(), "-d", getJarExpandDir(), "--allowmissingclasses");
             spec.setErrorOutput(errorOut);
             if (getLogger().isInfoEnabled() == false) {
@@ -364,7 +365,7 @@ public class ThirdPartyAuditTask extends DefaultTask {
                 getProject().getConfigurations().getByName(CompileOnlyResolvePlugin.RESOLVEABLE_COMPILE_ONLY_CONFIGURATION_NAME)
             );
 
-            spec.setMain(JDK_JAR_HELL_MAIN_CLASS);
+            spec.getMainClass().set(JDK_JAR_HELL_MAIN_CLASS);
             spec.args(getJarExpandDir());
             spec.setIgnoreExitValue(true);
             if (javaHome != null) {

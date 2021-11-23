@@ -14,8 +14,8 @@ import org.apache.lucene.index.SortedSetDocValues;
 import org.apache.lucene.search.SortField;
 import org.apache.lucene.search.SortedSetSelector;
 import org.apache.lucene.search.SortedSetSortField;
-import org.elasticsearch.common.Nullable;
 import org.elasticsearch.common.util.BigArrays;
+import org.elasticsearch.core.Nullable;
 import org.elasticsearch.index.fielddata.IndexFieldData;
 import org.elasticsearch.index.fielddata.IndexFieldData.XFieldComparatorSource.Nested;
 import org.elasticsearch.index.fielddata.IndexFieldDataCache;
@@ -30,6 +30,9 @@ import org.elasticsearch.search.sort.BucketedSort;
 import org.elasticsearch.search.sort.SortOrder;
 
 import java.util.function.Function;
+
+import static org.elasticsearch.index.fielddata.IndexFieldData.XFieldComparatorSource.sortMissingFirst;
+import static org.elasticsearch.index.fielddata.IndexFieldData.XFieldComparatorSource.sortMissingLast;
 
 public class SortedSetOrdinalsIndexFieldData extends AbstractIndexOrdinalsFieldData {
 
@@ -49,10 +52,7 @@ public class SortedSetOrdinalsIndexFieldData extends AbstractIndexOrdinalsFieldD
         }
 
         @Override
-        public SortedSetOrdinalsIndexFieldData build(
-            IndexFieldDataCache cache,
-            CircuitBreakerService breakerService
-        ) {
+        public SortedSetOrdinalsIndexFieldData build(IndexFieldDataCache cache, CircuitBreakerService breakerService) {
             return new SortedSetOrdinalsIndexFieldData(cache, name, valuesSourceType, breakerService, scriptFunction);
         }
     }
@@ -74,21 +74,33 @@ public class SortedSetOrdinalsIndexFieldData extends AbstractIndexOrdinalsFieldD
          * Check if we can use a simple {@link SortedSetSortField} compatible with index sorting and
          * returns a custom sort field otherwise.
          */
-        if (nested != null ||
-                (sortMode != MultiValueMode.MAX && sortMode != MultiValueMode.MIN) ||
-                (source.sortMissingLast(missingValue) == false && source.sortMissingFirst(missingValue) == false)) {
+        if (nested != null
+            || (sortMode != MultiValueMode.MAX && sortMode != MultiValueMode.MIN)
+            || (sortMissingLast(missingValue) == false && sortMissingFirst(missingValue) == false)) {
             return new SortField(getFieldName(), source, reverse);
         }
-        SortField sortField = new SortedSetSortField(getFieldName(), reverse,
-            sortMode == MultiValueMode.MAX ? SortedSetSelector.Type.MAX : SortedSetSelector.Type.MIN);
-        sortField.setMissingValue(source.sortMissingLast(missingValue) ^ reverse ?
-            SortedSetSortField.STRING_LAST : SortedSetSortField.STRING_FIRST);
+        SortField sortField = new SortedSetSortField(
+            getFieldName(),
+            reverse,
+            sortMode == MultiValueMode.MAX ? SortedSetSelector.Type.MAX : SortedSetSelector.Type.MIN
+        );
+        sortField.setMissingValue(
+            sortMissingLast(missingValue) ^ reverse ? SortedSetSortField.STRING_LAST : SortedSetSortField.STRING_FIRST
+        );
         return sortField;
     }
 
     @Override
-    public BucketedSort newBucketedSort(BigArrays bigArrays, Object missingValue, MultiValueMode sortMode, Nested nested,
-            SortOrder sortOrder, DocValueFormat format, int bucketSize, BucketedSort.ExtraData extra) {
+    public BucketedSort newBucketedSort(
+        BigArrays bigArrays,
+        Object missingValue,
+        MultiValueMode sortMode,
+        Nested nested,
+        SortOrder sortOrder,
+        DocValueFormat format,
+        int bucketSize,
+        BucketedSort.ExtraData extra
+    ) {
         throw new IllegalArgumentException("only supported on numeric fields");
     }
 
