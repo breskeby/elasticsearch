@@ -37,7 +37,6 @@ public class ThirdPartyAuditPrecommitPlugin extends PrecommitPlugin implements I
             // we are not doing this for this project itself to avoid jar hell with itself
             project.getDependencies().add(JDK_JAR_HELL_CONFIG_NAME, project.project(LIBS_ELASTICSEARCH_CORE_PROJECT_PATH));
         }
-
         TaskProvider<ExportElasticsearchBuildResourcesTask> resourcesTask = project.getTasks()
             .register("thirdPartyAuditResources", ExportElasticsearchBuildResourcesTask.class);
         Path resourcesDir = project.getBuildDir().toPath().resolve("third-party-audit-config");
