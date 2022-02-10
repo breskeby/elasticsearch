@@ -8,6 +8,8 @@
 
 package org.elasticsearch.gradle.internal;
 
+import org.elasticsearch.gradle.internal.idea.IdeaJavaModuleApiConsumerPlugin;
+import org.elasticsearch.gradle.internal.idea.IdeaJavaModuleApiPlugin;
 import org.gradle.api.Named;
 import org.gradle.api.Plugin;
 import org.gradle.api.Project;
@@ -35,6 +37,8 @@ public class ElasticsearchJavaModulePlugin implements Plugin<Project> {
     @Override
     public void apply(Project project) {
         // disable Gradle's modular support
+//        project.getPluginManager().apply(IdeaJavaModuleApiPlugin.class);
+//        project.getPluginManager().apply(IdeaJavaModuleApiConsumerPlugin.class);
         project.getTasks()
             .withType(JavaCompile.class)
             .configureEach(compileTask -> compileTask.getModularity().getInferModulePath().set(false));
@@ -71,7 +75,7 @@ public class ElasticsearchJavaModulePlugin implements Plugin<Project> {
             // Customized the JavaCompile for this source set so that it has proper module path.
             project.getTasks()
                 .named(sourceSet.getCompileJavaTaskName(), JavaCompile.class)
-                .configure(compileTask -> configureCompileJavaTask(compileTask, sourceSet, modularPaths, project));
+                .configure(compileTask -> configureCompileJavaTask(compileTask, sourceSet, modularPaths));
 
             // #### TODO: eventually do something for tests
             // Configure the (default) test task to use module paths.
@@ -132,12 +136,7 @@ public class ElasticsearchJavaModulePlugin implements Plugin<Project> {
         return modularPaths;
     }
 
-    private static void configureCompileJavaTask(
-        JavaCompile compileTask,
-        SourceSet sourceSet,
-        ModularPathsExtension modularPaths,
-        Project project
-    ) {
+    private static void configureCompileJavaTask(JavaCompile compileTask, SourceSet sourceSet, ModularPathsExtension modularPaths) {
         compileTask.dependsOn(modularPaths.compileModulePathConfiguration());
 
         // #### Do we still need this?
@@ -145,39 +144,9 @@ public class ElasticsearchJavaModulePlugin implements Plugin<Project> {
 
         // Add modular dependencies and their transitive dependencies to module path.
         compileTask.getOptions().getCompilerArgumentProviders().add(new CompileModulePathArgumentProvider(modularPaths));
+        FileCollection trimmedClasspath = sourceSet.getCompileClasspath().minus(modularPaths.compileModulePathConfiguration());
 
-        // ####
-        // If we modify the classpath here, IntelliJ no longer sees the dependencies as compile-time
-        // dependencies, don't know why.
-        if (System.getProperty("idea.active") == null) {
-            // Modify the default classpath by removing anything already placed on module path.
-            // This could be done in a fancier way but a set difference is just fine for us here. Use a lazy
-            // provider to delay computation of the actual path.
-            FileCollection trimmedClasspath = compileTask.getClasspath().minus(modularPaths.compileModulePathConfiguration());
-            // if (logger.isInfoEnabled()) {
-            // fileCollectionPathString(trimmedClasspath);
-            // logger.info("Class path for %s:\n%s".formatted(compileTask.getPath(), fileCollectionPathString(trimmedClasspath)));
-            // }
-            compileTask.setClasspath(project.files(trimmedClasspath));
-        }
-        // Closure closure = new Closure<FileCollection>(compileTask) {
-        // @Override
-        // public FileCollection call(Object... names) {
-        // FileCollection trimmedCp = compileTask.getClasspath().minus(modularPaths.compileModulePathConfiguration());
-        // // Do not enable logger. it will break the build
-        // // logger.info("Class path for %s:\n%s".formatted(compileTask.getPath(), fileCollectionPathString(trimmedCp)));
-        // return trimmedCp;
-        // }
-        // };
-        // compileTask.setClasspath(project.files(null, closure));
-        // });
-
-        // #### Experimenting here. Setup IDEs TODO: add eclipse
-        project.getPluginManager().withPlugin("idea", p -> {
-            IdeaModel idea = project.getExtensions().getByType(IdeaModel.class);
-            Map<String, Map<String, Collection<Configuration>>> scopes = idea.getModule().getScopes();
-            scopes.put("COMPILE", Map.of("plus", List.of(modularPaths.compileModulePathConfiguration())));
-        });
+        compileTask.setClasspath(new IdeaCompileClassPathFileCollection(trimmedClasspath));
     }
 
     // private static void configureTestTaskForSourceSet(Test task, SourceSet sourceSet) {

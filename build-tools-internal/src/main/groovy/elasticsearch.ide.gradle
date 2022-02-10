@@ -7,6 +7,7 @@
  */
 
 import org.elasticsearch.gradle.internal.info.BuildParams
+import org.elasticsearch.gradle.internal.idea.ConfigureIdeModuleClasspath
 import org.jetbrains.gradle.ext.JUnit
 
 import java.nio.file.Files
@@ -15,10 +16,13 @@ import java.nio.file.StandardCopyOption
 
 allprojects {
   apply plugin: 'idea'
-
   tasks.named('idea').configure {
     doFirst { throw new GradleException("Use of the 'idea' task has been deprecated. For details on importing into IntelliJ see CONTRIBUTING.md.") }
   }
+}
+
+tasks.register('configureIdeModuleClasspath', ConfigureIdeModuleClasspath) {
+  ideaRoot = file('.idea')
 }
 
 tasks.register('configureIdeCheckstyle') {
@@ -95,8 +99,12 @@ if (providers.systemProperty('idea.active').forUseAtConfigurationTime().getOrNul
     project {
       vcs = 'Git'
       jdkName = BuildParams.minimumCompilerVersion.majorVersion
-
       settings {
+        withIDEADir { File dir ->
+            println "IDEA DIR  = ${dir.absolutePath}"
+
+        }
+
         delegateActions {
           delegateBuildRunToGradle = true
           testRunner = 'choose_per_test'

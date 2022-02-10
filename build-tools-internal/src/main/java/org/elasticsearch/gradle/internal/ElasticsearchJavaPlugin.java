@@ -41,8 +41,8 @@ import static org.elasticsearch.gradle.internal.conventions.util.Util.toStringab
 public class ElasticsearchJavaPlugin implements Plugin<Project> {
     @Override
     public void apply(Project project) {
-        project.getPluginManager().apply(ElasticsearchJavaBasePlugin.class);
         project.getPluginManager().apply(JavaLibraryPlugin.class);
+        project.getPluginManager().apply(ElasticsearchJavaBasePlugin.class);
 
         // configureConfigurations(project);
         configureJars(project);

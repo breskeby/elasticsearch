@@ -8,7 +8,7 @@
 
 package org.elasticsearch.gradle.fixtures
 
-abstract class AbstractJavaModulesPluginFuncTest extends AbstractGradleFuncTest {
+abstract class AbstractIdeaJavaModuleApiPluginFuncTest extends AbstractGradleFuncTest {
 
     File moduleInfo(File root = testProjectDir.root, String name = root.name, List<String> requires = []) {
         file(root, 'src/main/java/module-info.java', """
@@ -36,7 +36,7 @@ module ${name} {
     }
 
     void writeConsumingJavaSource(File root = testProjectDir.root, String providingModuleName = 'providing') {
-        String name = root.name;
+        String name = root.name
         def componentName = "Consuming${providingModuleName.capitalize()}"
         def providingComponentName = componentName(providingModuleName)
         file(root, "src/main/java/org/${name}/" + componentName + ".java") << """package org.${name};

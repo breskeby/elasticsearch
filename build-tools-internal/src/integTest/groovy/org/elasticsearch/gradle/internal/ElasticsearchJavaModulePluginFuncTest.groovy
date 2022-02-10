@@ -9,13 +9,12 @@
 package org.elasticsearch.gradle.internal
 
 
-import org.elasticsearch.gradle.fixtures.AbstractJavaModulesPluginFuncTest
+import org.elasticsearch.gradle.fixtures.AbstractIdeaJavaModuleApiPluginFuncTest
 import org.gradle.testkit.runner.TaskOutcome
-import spock.lang.IgnoreRest
 import spock.util.environment.RestoreSystemProperties
 
 @RestoreSystemProperties
-class ElasticsearchJavaModulePluginFuncTest extends AbstractJavaModulesPluginFuncTest {
+class ElasticsearchJavaModulePluginFuncTest extends AbstractIdeaJavaModuleApiPluginFuncTest {
 
     def setup() {
         settingsFile << "include 'providing'\n"
