@@ -22,6 +22,7 @@ import org.gradle.api.plugins.JavaPluginExtension;
 import org.gradle.api.tasks.Copy;
 import org.gradle.api.tasks.SourceSet;
 import org.gradle.api.tasks.SourceSetOutput;
+import org.gradle.api.tasks.Sync;
 import org.gradle.api.tasks.TaskProvider;
 
 import java.io.File;
@@ -76,7 +77,7 @@ public class IdeaJavaModuleApiPlugin implements Plugin<Project> {
                 exportModuleInfo.configure(e -> e.setClassFiles(sourceSetOutput.getClassesDirs()));
 
                 String modulesApiName = sourceSet.getTaskName("modulesApi", "Classes");
-                TaskProvider<Copy> moduleApiClasses = project.getTasks().register(modulesApiName, Copy.class, t -> {
+                TaskProvider<Sync> moduleApiClasses = project.getTasks().register(modulesApiName, Sync.class, t -> {
                     t.dependsOn(exportModuleInfo);
                     t.setDestinationDir(new File(project.getBuildDir(), JAVA_MODULE_API_IDENTIFIER));
                     t.from(sourceSetOutput);

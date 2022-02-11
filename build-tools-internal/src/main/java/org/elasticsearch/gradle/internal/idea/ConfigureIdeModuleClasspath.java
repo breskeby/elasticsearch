@@ -9,6 +9,7 @@
 package org.elasticsearch.gradle.internal.idea;
 
 import org.gradle.api.DefaultTask;
+import org.gradle.api.GradleException;
 import org.gradle.api.file.FileVisitDetails;
 import org.gradle.api.file.FileVisitor;
 import org.gradle.api.tasks.InputDirectory;
@@ -18,8 +19,6 @@ import org.w3c.dom.Element;
 import org.w3c.dom.NodeList;
 
 import java.io.File;
-import java.io.IOException;
-import java.nio.file.Files;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
@@ -47,12 +46,6 @@ public class ConfigureIdeModuleClasspath extends DefaultTask {
         getProject().fileTree(modulesRoot).matching(patternFilterable -> patternFilterable.include("**/*.iml")).visit(new FileVisitor() {
             @Override
             public void visitDir(FileVisitDetails fileDetails) {
-                File dir = new File(fileDetails.getFile(), "intro.log");
-                try {
-                    Files.writeString(dir.toPath(), "intro log");
-                } catch (IOException e) {
-                    e.printStackTrace();
-                }
             }
 
             @Override
@@ -69,11 +62,11 @@ public class ConfigureIdeModuleClasspath extends DefaultTask {
         updateOrderEntriesValue(doc);
     }
 
-    private static void updateOrderEntriesValue(Document doc) {
+    private static void updateOrderEntriesValue(Document doc) throws GradleException {
         NodeList orderEntries = doc.getElementsByTagName("orderEntry");
         for (int i = 0; i < orderEntries.getLength(); i++) {
             Element entry = (Element) orderEntries.item(i);
-            if (isApiJarReference(entry)) {
+            if (isModuleApiReference(entry)) {
                 if (entry.getAttribute("type").equals("module-library")) {
                     Element classes = (Element) entry.getElementsByTagName("CLASSES").item(0);
                     Element classesRoot = (Element) classes.getElementsByTagName("root").item(0);
@@ -92,10 +85,13 @@ public class ConfigureIdeModuleClasspath extends DefaultTask {
     private static String calculateSourceRootFromClasses(String classesUrl) {
         Pattern p = Pattern.compile(".*\\$MODULE_DIR\\$/(.*)(build/java-module-api)");
         Matcher m = p.matcher(classesUrl);
-        return "file://$MODULE_DIR$/" + m.group(1) + "src/main/java";
+        if(m.matches()) {
+            return "file://$MODULE_DIR$/" + m.group(1) + "src/main/java";
+        }
+        throw new GradleException("Cannot calculate Root source for " + classesUrl);
     }
 
-    private static boolean isApiJarReference(Element element) {
+    private static boolean isModuleApiReference(Element element) {
         if (element.getAttribute("type").equals("module-library")) {
             Element classes = (Element) element.getElementsByTagName("CLASSES").item(0);
             Element classesRoot = (Element) classes.getElementsByTagName("root").item(0);
