@@ -18,6 +18,7 @@ import org.gradle.api.plugins.JavaPluginExtension;
 
 import javax.inject.Inject;
 
+import static org.gradle.api.attributes.LibraryElements.CLASSES;
 import static org.gradle.api.attributes.LibraryElements.JAR;
 
 /**
@@ -40,7 +41,7 @@ public class IdeaJavaModuleApiConsumerPlugin implements Plugin<Project> {
             Attribute<Boolean> javaModuleAttribute = Attribute.of("org.elasticsearch.java-module-api", Boolean.class);
             compileConfig.getAttributes().attribute(javaModuleAttribute, Boolean.TRUE);
             compileConfig.getAttributes()
-                .attribute(LibraryElements.LIBRARY_ELEMENTS_ATTRIBUTE, objectFactory.named(LibraryElements.class, JAR));
+                .attribute(LibraryElements.LIBRARY_ELEMENTS_ATTRIBUTE, objectFactory.named(LibraryElements.class, CLASSES));
 
         });
 

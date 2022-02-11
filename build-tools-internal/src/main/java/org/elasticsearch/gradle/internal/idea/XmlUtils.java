@@ -11,6 +11,8 @@ package org.elasticsearch.gradle.internal.idea;
 import org.gradle.api.GradleException;
 import org.w3c.dom.Document;
 
+import java.io.File;
+
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
 import javax.xml.transform.OutputKeys;
@@ -18,7 +20,6 @@ import javax.xml.transform.Transformer;
 import javax.xml.transform.TransformerFactory;
 import javax.xml.transform.dom.DOMSource;
 import javax.xml.transform.stream.StreamResult;
-import java.io.File;
 
 public class XmlUtils {
 
@@ -34,7 +35,7 @@ public class XmlUtils {
     }
 
     static void writeDoc(Document doc, File imlFile) {
-        //write the updated document to file or console
+        // write the updated document to file or console
         doc.getDocumentElement().normalize();
         TransformerFactory transformerFactory = TransformerFactory.newInstance();
         try {

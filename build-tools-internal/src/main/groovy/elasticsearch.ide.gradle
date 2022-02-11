@@ -21,10 +21,6 @@ allprojects {
   }
 }
 
-tasks.register('configureIdeModuleClasspath', ConfigureIdeModuleClasspath) {
-  ideaRoot = file('.idea')
-}
-
 tasks.register('configureIdeCheckstyle') {
   group = 'ide'
   description = 'Generated a suitable checkstyle config for IDEs'
@@ -95,6 +91,10 @@ if (providers.systemProperty('idea.active').forUseAtConfigurationTime().getOrNul
     dependsOn ':client:rest-high-level:shadowJar', ':plugins:repository-hdfs:hadoop-client-api:shadowJar', ':modules:repository-azure:azure-storage-blob:shadowJar'
   }
 
+  tasks.register('configureIdeModuleClasspath', ConfigureIdeModuleClasspath) {
+    ideaRoot = file('.idea')
+  }
+
   idea {
     project {
       vcs = 'Git'
@@ -110,7 +110,7 @@ if (providers.systemProperty('idea.active').forUseAtConfigurationTime().getOrNul
           testRunner = 'choose_per_test'
         }
         taskTriggers {
-          afterSync tasks.named('configureIdeCheckstyle'), tasks.named('configureIdeaGradleJvm'), tasks.named('buildDependencyArtifacts')
+          afterSync tasks.named('configureIdeModuleClasspath'), tasks.named('configureIdeCheckstyle'), tasks.named('configureIdeaGradleJvm'), tasks.named('buildDependencyArtifacts')
         }
         encodings {
           encoding = 'UTF-8'

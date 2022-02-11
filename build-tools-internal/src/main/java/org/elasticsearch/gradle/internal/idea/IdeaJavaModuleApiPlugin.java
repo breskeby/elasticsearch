@@ -19,16 +19,19 @@ import org.gradle.api.attributes.Usage;
 import org.gradle.api.attributes.java.TargetJvmVersion;
 import org.gradle.api.model.ObjectFactory;
 import org.gradle.api.plugins.JavaPluginExtension;
+import org.gradle.api.tasks.Copy;
 import org.gradle.api.tasks.SourceSet;
 import org.gradle.api.tasks.SourceSetOutput;
 import org.gradle.api.tasks.TaskProvider;
 import org.gradle.api.tasks.bundling.Jar;
 
+import java.io.File;
 import java.util.Set;
 
 import javax.inject.Inject;
 
 import static org.gradle.api.attributes.Category.LIBRARY;
+import static org.gradle.api.attributes.LibraryElements.CLASSES;
 import static org.gradle.api.attributes.LibraryElements.JAR;
 import static org.gradle.api.attributes.LibraryElements.LIBRARY_ELEMENTS_ATTRIBUTE;
 
@@ -74,10 +77,10 @@ public class IdeaJavaModuleApiPlugin implements Plugin<Project> {
                     .register(exportModuleInfoName, ReadModuleExports.class);
                 exportModuleInfo.configure(e -> e.setClassFiles(sourceSetOutput.getClassesDirs()));
 
-                String modulesApiName = sourceSet.getTaskName("modulesApi", "Jar");
-                TaskProvider<Jar> moduleApiJar = project.getTasks().register(modulesApiName, Jar.class, t -> {
+                String modulesApiName = sourceSet.getTaskName("modulesApi", "Classes");
+                TaskProvider<Copy> moduleApiClasses = project.getTasks().register(modulesApiName, Copy.class, t -> {
                     t.dependsOn(exportModuleInfo);
-                    t.getArchiveAppendix().set(JAVA_MODULE_API_APPENDIX);
+                    t.setDestinationDir(new File(project.getBuildDir(), "modules-api-classes"));
                     t.from(sourceSetOutput);
                     t.include(e -> {
                         Set<String> exports = exportModuleInfo.get().getExports();
@@ -96,7 +99,7 @@ public class IdeaJavaModuleApiPlugin implements Plugin<Project> {
                         return true;
                     });
                 });
-                moduleApiElements.getOutgoing().artifact(moduleApiJar);
+                moduleApiElements.getOutgoing().artifact(moduleApiClasses);
             });
 
         });
@@ -115,7 +118,7 @@ public class IdeaJavaModuleApiPlugin implements Plugin<Project> {
             moduleApiElements.setCanBeResolved(false);
             moduleApiElements.getAttributes()
                 .attribute(Category.CATEGORY_ATTRIBUTE, objectFactory.named(Category.class, LIBRARY))
-                .attribute(LIBRARY_ELEMENTS_ATTRIBUTE, objectFactory.named(LibraryElements.class, JAR))
+                .attribute(LIBRARY_ELEMENTS_ATTRIBUTE, objectFactory.named(LibraryElements.class, CLASSES))
                 .attribute(Bundling.BUNDLING_ATTRIBUTE, objectFactory.named(Bundling.class, Bundling.EXTERNAL))
                 // TODO rework hard coded jvm version
                 .attribute(TargetJvmVersion.TARGET_JVM_VERSION_ATTRIBUTE, 17)

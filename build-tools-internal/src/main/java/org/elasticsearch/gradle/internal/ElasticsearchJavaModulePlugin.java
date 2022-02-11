@@ -36,9 +36,9 @@ public class ElasticsearchJavaModulePlugin implements Plugin<Project> {
 
     @Override
     public void apply(Project project) {
+        project.getPluginManager().apply(IdeaJavaModuleApiPlugin.class);
+        project.getPluginManager().apply(IdeaJavaModuleApiConsumerPlugin.class);
         // disable Gradle's modular support
-//        project.getPluginManager().apply(IdeaJavaModuleApiPlugin.class);
-//        project.getPluginManager().apply(IdeaJavaModuleApiConsumerPlugin.class);
         project.getTasks()
             .withType(JavaCompile.class)
             .configureEach(compileTask -> compileTask.getModularity().getInferModulePath().set(false));

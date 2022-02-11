@@ -13,16 +13,15 @@ import org.gradle.api.file.FileVisitDetails;
 import org.gradle.api.file.FileVisitor;
 import org.gradle.api.tasks.InputDirectory;
 import org.gradle.api.tasks.TaskAction;
+import org.w3c.dom.Document;
+import org.w3c.dom.Element;
+import org.w3c.dom.NodeList;
 
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-
-import org.w3c.dom.Document;
-import org.w3c.dom.Element;
-import org.w3c.dom.NodeList;
 
 import static org.elasticsearch.gradle.internal.idea.IdeaJavaModuleApiPlugin.JAVA_MODULE_API_APPENDIX;
 import static org.elasticsearch.gradle.internal.idea.XmlUtils.docFromFile;
@@ -43,29 +42,27 @@ public class ConfigureIdeModuleClasspath extends DefaultTask {
 
     @TaskAction
     void tweakClasspath() {
-//        throw new GradleException("boom");
+        // throw new GradleException("boom");
         File modulesRoot = new File(ideaRoot, "modules");
-        getProject().fileTree(modulesRoot)
-            .matching(patternFilterable -> patternFilterable.include("**/*.iml"))
-            .visit(new FileVisitor() {
-                @Override
-                public void visitDir(FileVisitDetails fileDetails) {
-                    File dir = new File(fileDetails.getFile(), "intro.log");
-                    try {
-                        Files.writeString(dir.toPath(), "intro log");
-                    } catch (IOException e) {
-                        e.printStackTrace();
-                    }
+        getProject().fileTree(modulesRoot).matching(patternFilterable -> patternFilterable.include("**/*.iml")).visit(new FileVisitor() {
+            @Override
+            public void visitDir(FileVisitDetails fileDetails) {
+                File dir = new File(fileDetails.getFile(), "intro.log");
+                try {
+                    Files.writeString(dir.toPath(), "intro log");
+                } catch (IOException e) {
+                    e.printStackTrace();
                 }
+            }
 
-                @Override
-                public void visitFile(FileVisitDetails fileVisitDetails) {
-                    File imlFile = fileVisitDetails.getFile();
-                    Document doc = docFromFile(imlFile);
-                    visitDoc(doc);
-                    writeDoc(doc, imlFile);
-                }
-            });
+            @Override
+            public void visitFile(FileVisitDetails fileVisitDetails) {
+                File imlFile = fileVisitDetails.getFile();
+                Document doc = docFromFile(imlFile);
+                visitDoc(doc);
+                writeDoc(doc, imlFile);
+            }
+        });
     }
 
     private void visitDoc(Document doc) {
@@ -74,13 +71,13 @@ public class ConfigureIdeModuleClasspath extends DefaultTask {
 
     private static void updateOrderEntriesValue(Document doc) {
         NodeList orderEntries = doc.getElementsByTagName("orderEntry");
-        for(int i=0; i<orderEntries.getLength();i++){
+        for (int i = 0; i < orderEntries.getLength(); i++) {
             Element entry = (Element) orderEntries.item(i);
-            if(isApiJarReference(entry)) {
-                if(entry.getAttribute("type").equals("module-library")) {
+            if (isApiJarReference(entry)) {
+                if (entry.getAttribute("type").equals("module-library")) {
                     Element classes = (Element) entry.getElementsByTagName("CLASSES").item(0);
                     Element classesRoot = (Element) classes.getElementsByTagName("root").item(0);
-                    if(classesRoot != null) {
+                    if (classesRoot != null) {
                         String classesUrl = classesRoot.getAttribute("url");
                         Element sources = (Element) entry.getElementsByTagName("SOURCES").item(0);
                         Element rootSourceElement = doc.createElement("root");
@@ -102,12 +99,12 @@ public class ConfigureIdeModuleClasspath extends DefaultTask {
     }
 
     private static boolean isApiJarReference(Element element) {
-        if(element.getAttribute("type").equals("module-library")) {
+        if (element.getAttribute("type").equals("module-library")) {
             Element classes = (Element) element.getElementsByTagName("CLASSES").item(0);
             Element classesRoot = (Element) classes.getElementsByTagName("root").item(0);
-            if(classesRoot != null) {
+            if (classesRoot != null) {
                 String classesUrl = classesRoot.getAttribute("url");
-                return  classesUrl.matches(".*-" + JAVA_MODULE_API_APPENDIX + ".*");
+                return classesUrl.matches(".*-" + JAVA_MODULE_API_APPENDIX + ".*");
             }
         }
         return false;
