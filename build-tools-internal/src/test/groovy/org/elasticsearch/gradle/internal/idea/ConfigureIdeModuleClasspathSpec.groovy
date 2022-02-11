@@ -59,7 +59,7 @@ class ConfigureIdeModuleClasspathSpec extends Specification {
     <orderEntry type="module-library" scope="PROVIDED">
       <library>
         <CLASSES>
-          <root url="jar://$MODULE_DIR$/../../../../server/build/distributions/elasticsearch-java-module-api-8.1.0-SNAPSHOT.jar!/" />
+          <root url="file://$MODULE_DIR$/../../../../server/build/java-module-api" />
         </CLASSES>
         <JAVADOC />
         <SOURCES>
@@ -94,7 +94,7 @@ class ConfigureIdeModuleClasspathSpec extends Specification {
     <orderEntry type="module-library" scope="PROVIDED">
       <library>
         <CLASSES>
-          <root url="jar://$MODULE_DIR$/../../../../server/build/distributions/elasticsearch-java-module-api-8.1.0-SNAPSHOT.jar!/" />
+          <root url="file://$MODULE_DIR$/../../../../server/build/java-module-api" />
         </CLASSES>
         <JAVADOC />
         <SOURCES/>

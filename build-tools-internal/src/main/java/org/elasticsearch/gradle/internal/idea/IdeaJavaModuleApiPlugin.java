@@ -23,7 +23,6 @@ import org.gradle.api.tasks.Copy;
 import org.gradle.api.tasks.SourceSet;
 import org.gradle.api.tasks.SourceSetOutput;
 import org.gradle.api.tasks.TaskProvider;
-import org.gradle.api.tasks.bundling.Jar;
 
 import java.io.File;
 import java.util.Set;
@@ -32,7 +31,6 @@ import javax.inject.Inject;
 
 import static org.gradle.api.attributes.Category.LIBRARY;
 import static org.gradle.api.attributes.LibraryElements.CLASSES;
-import static org.gradle.api.attributes.LibraryElements.JAR;
 import static org.gradle.api.attributes.LibraryElements.LIBRARY_ELEMENTS_ATTRIBUTE;
 
 /**
@@ -49,7 +47,7 @@ import static org.gradle.api.attributes.LibraryElements.LIBRARY_ELEMENTS_ATTRIBU
  * */
 public class IdeaJavaModuleApiPlugin implements Plugin<Project> {
 
-    public static final String JAVA_MODULE_API_APPENDIX = "java-module-api";
+    public static final String JAVA_MODULE_API_IDENTIFIER = "java-module-api";
     private final ObjectFactory objectFactory;
 
     @Inject
@@ -80,7 +78,7 @@ public class IdeaJavaModuleApiPlugin implements Plugin<Project> {
                 String modulesApiName = sourceSet.getTaskName("modulesApi", "Classes");
                 TaskProvider<Copy> moduleApiClasses = project.getTasks().register(modulesApiName, Copy.class, t -> {
                     t.dependsOn(exportModuleInfo);
-                    t.setDestinationDir(new File(project.getBuildDir(), "modules-api-classes"));
+                    t.setDestinationDir(new File(project.getBuildDir(), JAVA_MODULE_API_IDENTIFIER));
                     t.from(sourceSetOutput);
                     t.include(e -> {
                         Set<String> exports = exportModuleInfo.get().getExports();

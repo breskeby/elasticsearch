@@ -23,7 +23,7 @@ import java.nio.file.Files;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
-import static org.elasticsearch.gradle.internal.idea.IdeaJavaModuleApiPlugin.JAVA_MODULE_API_APPENDIX;
+import static org.elasticsearch.gradle.internal.idea.IdeaJavaModuleApiPlugin.JAVA_MODULE_API_IDENTIFIER;
 import static org.elasticsearch.gradle.internal.idea.XmlUtils.docFromFile;
 import static org.elasticsearch.gradle.internal.idea.XmlUtils.writeDoc;
 
@@ -90,11 +90,8 @@ public class ConfigureIdeModuleClasspath extends DefaultTask {
     }
 
     private static String calculateSourceRootFromClasses(String classesUrl) {
-        Pattern p = Pattern.compile(".*\\$MODULE_DIR\\$/(.*)(build/distributions/.*java-module-api.*)!/");
+        Pattern p = Pattern.compile(".*\\$MODULE_DIR\\$/(.*)(build/java-module-api)");
         Matcher m = p.matcher(classesUrl);
-        System.out.println("m.matches() = " + m.matches());
-        System.out.println("m.groupCount() = " + m.groupCount());
-        System.out.println("m.group() = " + m.group());
         return "file://$MODULE_DIR$/" + m.group(1) + "src/main/java";
     }
 
@@ -104,7 +101,7 @@ public class ConfigureIdeModuleClasspath extends DefaultTask {
             Element classesRoot = (Element) classes.getElementsByTagName("root").item(0);
             if (classesRoot != null) {
                 String classesUrl = classesRoot.getAttribute("url");
-                return classesUrl.matches(".*-" + JAVA_MODULE_API_APPENDIX + ".*");
+                return classesUrl.matches(".*" + JAVA_MODULE_API_IDENTIFIER + ".*");
             }
         }
         return false;
