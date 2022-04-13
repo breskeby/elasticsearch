@@ -79,37 +79,8 @@ public class PluginBuildPlugin implements Plugin<Project> {
             String name = extension.getName();
             project1.setProperty("archivesBaseName", name);
             project1.setDescription(extension.getDescription());
-
-            if (extension.getName() == null) {
-                throw new InvalidUserDataException("name is a required setting for esplugin");
-            }
-
-            if (extension.getDescription() == null) {
-                throw new InvalidUserDataException("description is a required setting for esplugin");
-            }
-
-            if (extension.getType().equals(PluginType.BOOTSTRAP) == false && extension.getClassname() == null) {
-                throw new InvalidUserDataException("classname is a required setting for esplugin");
-            }
-
-            Map<String, Object> map = new LinkedHashMap<>(12);
-            map.put("name", extension.getName());
-            map.put("description", extension.getDescription());
-            map.put("version", extension.getVersion());
-            map.put("elasticsearchVersion", Version.fromString(VersionProperties.getElasticsearch()).toString());
-            map.put("javaVersion", project1.getExtensions().getByType(JavaPluginExtension.class).getTargetCompatibility().toString());
-            map.put("classname", extension.getType().equals(PluginType.BOOTSTRAP) ? "" : extension.getClassname());
-            map.put("extendedPlugins", extension.getExtendedPlugins().stream().collect(Collectors.joining(",")));
-            map.put("hasNativeController", extension.isHasNativeController());
-            map.put("requiresKeystore", extension.isRequiresKeystore());
-            map.put("type", extension.getType().toString());
-            map.put("javaOpts", extension.getJavaOpts());
-            map.put("licensed", extension.isLicensed());
-            project1.getTasks().withType(Copy.class).named("pluginProperties").configure(copy -> {
-                copy.expand(map);
-                copy.getInputs().properties(map);
-            });
         });
+
         project.getConfigurations().getByName("default").extendsFrom(project.getConfigurations().getByName("runtimeClasspath"));
 
         // allow running ES with this plugin in the foreground of a build
@@ -185,11 +156,69 @@ public class PluginBuildPlugin implements Plugin<Project> {
                 });
             }
         });
+
+        final var resolveModuleName = project.getTasks().register("resolveModuleName", t -> {
+            t.doLast(new Action<Task>() {
+                @Override
+                public void execute(Task task) {
+                    t.getExtensions().add("resolvedModuleName", "some-resolved-module");
+                }
+            });
+        });
+
         final var buildProperties = project.getTasks().register("pluginProperties", Copy.class, copy -> {
             copy.dependsOn(copyPluginPropertiesTemplate);
             copy.from(templateFile);
             copy.into(new File(project.getBuildDir(), "generated-resources"));
+
+
+            if (extension.getName() == null) {
+                throw new InvalidUserDataException("name is a required setting for esplugin");
+            }
+
+            if (extension.getDescription() == null) {
+                throw new InvalidUserDataException("description is a required setting for esplugin");
+            }
+
+            if (extension.getType().equals(PluginType.BOOTSTRAP) == false && extension.getClassname() == null) {
+                throw new InvalidUserDataException("classname is a required setting for esplugin");
+            }
+
+            Map<String, Object> map = new LinkedHashMap<>(12);
+            map.put("name", extension.getName());
+            map.put("description", extension.getDescription());
+            map.put("version", extension.getVersion());
+            map.put("elasticsearchVersion", Version.fromString(VersionProperties.getElasticsearch()).toString());
+            map.put("javaVersion", project.getExtensions().getByType(JavaPluginExtension.class).getTargetCompatibility().toString());
+            map.put("classname", extension.getType().equals(PluginType.BOOTSTRAP) ? "" : extension.getClassname());
+            map.put("extendedPlugins", extension.getExtendedPlugins().stream().collect(Collectors.joining(",")));
+            map.put("hasNativeController", extension.isHasNativeController());
+            map.put("requiresKeystore", extension.isRequiresKeystore());
+            map.put("type", extension.getType().toString());
+            map.put("javaOpts", extension.getJavaOpts());
+            map.put("licensed", extension.isLicensed());
+
+            var lazyModuleName = new Callable<String>() {
+                @Override
+                public String call() {
+                    return resolveModuleName.map(t -> t.getExtensions().getByName("resolvedModuleName")).get().toString();
+                }
+
+                @Override
+                public String toString() {
+                    return call();
+                }
+            };
+            map.put("moduleName", lazyModuleName);
+            copy.dependsOn(resolveModuleName);
+            copy.expand(map);
+            copy.getInputs().properties(map);
+
         });
+
+
+
+
         // add the plugin properties and metadata to test resources, so unit tests can
         // know about the plugin (used by test security code to statically initialize the plugin in unit tests)
         var testSourceSet = project.getExtensions().getByType(SourceSetContainer.class).getByName("test");
