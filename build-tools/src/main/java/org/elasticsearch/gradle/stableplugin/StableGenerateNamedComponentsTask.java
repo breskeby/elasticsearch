@@ -8,25 +8,21 @@
 
 package org.elasticsearch.gradle.stableplugin;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.elasticsearch.gradle.stableplugin.scanner.NamedComponentScanner;
 import org.elasticsearch.plugin.scanner.impl.ClassReaders;
 import org.gradle.api.DefaultTask;
 import org.gradle.api.file.ConfigurableFileCollection;
 import org.gradle.api.file.FileCollection;
-import org.gradle.api.file.FileSystemLocation;
 import org.gradle.api.file.ProjectLayout;
 import org.gradle.api.file.RegularFileProperty;
 import org.gradle.api.logging.Logger;
 import org.gradle.api.logging.Logging;
 import org.gradle.api.model.ObjectFactory;
-import org.gradle.api.provider.Property;
-import org.gradle.api.provider.SetProperty;
 import org.gradle.api.tasks.CompileClasspath;
 import org.gradle.api.tasks.InputFiles;
 import org.gradle.api.tasks.OutputFile;
 import org.gradle.api.tasks.TaskAction;
-import org.gradle.internal.impldep.com.fasterxml.jackson.core.JsonProcessingException;
-import org.gradle.internal.impldep.com.fasterxml.jackson.databind.ObjectMapper;
 import org.gradle.workers.WorkAction;
 import org.gradle.workers.WorkParameters;
 import org.gradle.workers.WorkerExecutor;

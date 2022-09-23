@@ -12,11 +12,15 @@ import org.elasticsearch.gradle.Version;
 import org.elasticsearch.gradle.VersionProperties;
 import org.elasticsearch.gradle.dependencies.CompileOnlyResolvePlugin;
 import org.elasticsearch.gradle.jarhell.JarHellPlugin;
+import org.elasticsearch.gradle.plugin.BasePluginPlugin;
+import org.elasticsearch.gradle.plugin.GeneratePluginPropertiesTask;
+import org.elasticsearch.gradle.plugin.PluginPropertiesExtension;
 import org.elasticsearch.gradle.test.GradleTestPolicySetupPlugin;
 import org.elasticsearch.gradle.testclusters.ElasticsearchCluster;
 import org.elasticsearch.gradle.testclusters.RunTask;
 import org.elasticsearch.gradle.testclusters.TestClustersPlugin;
 import org.elasticsearch.gradle.util.GradleUtils;
+import org.gradle.api.Action;
 import org.gradle.api.NamedDomainObjectContainer;
 import org.gradle.api.Plugin;
 import org.gradle.api.Project;
@@ -61,33 +65,43 @@ public class StablePluginBuildPlugin implements Plugin<Project> {
 
     @Override
     public void apply(final Project project) {
-        project.getPluginManager().apply(JavaPlugin.class);
-        project.getPluginManager().apply(TestClustersPlugin.class);
-        project.getPluginManager().apply(CompileOnlyResolvePlugin.class);
-        project.getPluginManager().apply(JarHellPlugin.class);
-        project.getPluginManager().apply(GradleTestPolicySetupPlugin.class);
+        project.getPluginManager().apply(BasePluginPlugin.class);
+        PluginPropertiesExtension pluginExtension = project.getExtensions().getByType(PluginPropertiesExtension.class);
 
-        var extension = project.getExtensions().create(PLUGIN_EXTENSION_NAME, StablePluginPropertiesExtension.class, project);
-        configureDependencies(project);
-
-        final var bundleTask = createBundleTasks(project, extension);
-        project.getConfigurations().getByName("default").extendsFrom(project.getConfigurations().getByName("runtimeClasspath"));
-
-        // allow running ES with this plugin in the foreground of a build
-        var testClusters = testClusters(project, TestClustersPlugin.EXTENSION_NAME);
-        var runCluster = testClusters.register("stablerunTask", c -> {
-            // TODO: use explodedPlugin here for modules
-            if (GradleUtils.isModuleProject(project.getPath())) {
-                c.module(bundleTask.flatMap((Transformer<Provider<RegularFile>, Zip>) zip -> zip.getArchiveFile()));
-            } else {
-                c.plugin(bundleTask.flatMap((Transformer<Provider<RegularFile>, Zip>) zip -> zip.getArchiveFile()));
-            }
+        final var pluginNamedComponents = project.getTasks().register("pluginNamedComponents", StableGenerateNamedComponentsTask.class, t -> {
+            SourceSet mainSourceSet = GradleUtils.getJavaSourceSets(project).findByName(SourceSet.MAIN_SOURCE_SET_NAME);
+            t.setPluginClasses(mainSourceSet.getOutput().getClassesDirs());
+            t.setClasspath(project.getConfigurations().getByName(JavaPlugin.RUNTIME_CLASSPATH_CONFIGURATION_NAME));
         });
 
-        project.getTasks().register("stablerun", RunTask.class, r -> {
-            r.useCluster(runCluster);
-            r.dependsOn(project.getTasks().named(BUNDLE_PLUGIN_TASK_NAME));
+        pluginExtension.getBundleSpec().from(pluginNamedComponents);
+
+        project.getTasks().withType(GeneratePluginPropertiesTask.class).named("pluginProperties").configure(task -> {
+            task.
         });
+
+//
+//        var extension = project.getExtensions().create(PLUGIN_EXTENSION_NAME, StablePluginPropertiesExtension.class, project);
+//        configureDependencies(project);
+//
+//        final var bundleTask = createBundleTasks(project, extension);
+//        project.getConfigurations().getByName("default").extendsFrom(project.getConfigurations().getByName("runtimeClasspath"));
+//
+//        // allow running ES with this plugin in the foreground of a build
+//        var testClusters = testClusters(project, TestClustersPlugin.EXTENSION_NAME);
+//        var runCluster = testClusters.register("stablerunTask", c -> {
+//            // TODO: use explodedPlugin here for modules
+//            if (GradleUtils.isModuleProject(project.getPath())) {
+//                c.module(bundleTask.flatMap((Transformer<Provider<RegularFile>, Zip>) zip -> zip.getArchiveFile()));
+//            } else {
+//                c.plugin(bundleTask.flatMap((Transformer<Provider<RegularFile>, Zip>) zip -> zip.getArchiveFile()));
+//            }
+//        });
+//
+//        project.getTasks().register("stablerun", RunTask.class, r -> {
+//            r.useCluster(runCluster);
+//            r.dependsOn(project.getTasks().named(BUNDLE_PLUGIN_TASK_NAME));
+//        });
     }
 
     @SuppressWarnings("unchecked")

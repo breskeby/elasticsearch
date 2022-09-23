@@ -38,7 +38,7 @@ import java.util.Map;
 import javax.inject.Inject;
 
 public abstract class GeneratePluginPropertiesTask extends DefaultTask {
-
+e
     private static final String PROPERTIES_FILENAME = "plugin-descriptor.properties";
 
     @Inject

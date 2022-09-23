@@ -21,7 +21,7 @@ import java.util.List;
  * A container for plugin properties that will be written to the plugin descriptor, for easy
  * manipulation in the gradle DSL.
  */
-public class StablePluginPropertiesExtension {
+public class StablePluginPropertiesExtension extends BasePluginPropertiesExtension {
     private String name;
 
     private String version;

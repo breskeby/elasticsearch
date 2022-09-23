@@ -10,10 +10,12 @@
    > Could not create an instance of type org.gradle.api.plugins.jvm.internal.DefaultJvmTestSuite.
       > Cannot add a SourceSet with name 'test' as a SourceSet with that name already exists.
  */
+
 apply plugin: 'elasticsearch.stableesplugin'
 apply plugin: 'elasticsearch.internal-yaml-rest-test'
+
+
 apply plugin: 'elasticsearch.yaml-rest-compat-test'
-//apply plugin: 'elasticsearch.java'
 
 
 stableesplugin {
