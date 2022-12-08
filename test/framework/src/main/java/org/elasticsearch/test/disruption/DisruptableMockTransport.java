@@ -172,28 +172,15 @@ public abstract class DisruptableMockTransport extends MockTransport {
             @Override
             public void ifRebooted() {
                 request.decRef();
-                deterministicTaskQueue.scheduleNow(new Runnable() {
+                execute(new Runnable() {
                     @Override
                     public void run() {
-                        execute(new Runnable() {
-                            @Override
-                            public void run() {
-                                handleRemoteError(
-                                    requestId,
-                                    new NodeNotConnectedException(destinationTransport.getLocalNode(), "node rebooted")
-                                );
-                            }
-
-                            @Override
-                            public String toString() {
-                                return "error response (reboot) to " + internalToString();
-                            }
-                        });
+                        handleRemoteError(requestId, new NodeNotConnectedException(destinationTransport.getLocalNode(), "node rebooted"));
                     }
 
                     @Override
                     public String toString() {
-                        return "scheduling of error response (reboot) to " + internalToString();
+                        return "error response (reboot) to " + internalToString();
                     }
                 });
             }
@@ -272,13 +259,19 @@ public abstract class DisruptableMockTransport extends MockTransport {
 
             @Override
             public void sendResponse(final TransportResponse response) {
-                execute(new Runnable() {
+                execute(new RebootSensitiveRunnable() {
+                    @Override
+                    public void ifRebooted() {
+                        response.decRef();
+                    }
+
                     @Override
                     public void run() {
                         final ConnectionStatus connectionStatus = destinationTransport.getConnectionStatus(getLocalNode());
                         switch (connectionStatus) {
                             case CONNECTED, BLACK_HOLE_REQUESTS_ONLY -> handleResponse(requestId, response);
                             case BLACK_HOLE, DISCONNECTED -> {
+                                response.decRef();
                                 logger.trace("delaying response to {}: channel is {}", requestDescription, connectionStatus);
                                 onBlackholedDuringSend(requestId, action, destinationTransport);
                             }
@@ -295,7 +288,6 @@ public abstract class DisruptableMockTransport extends MockTransport {
 
             @Override
             public void sendResponse(Exception exception) {
-
                 execute(new Runnable() {
                     @Override
                     public void run() {
@@ -333,6 +325,8 @@ public abstract class DisruptableMockTransport extends MockTransport {
             } catch (Exception ee) {
                 logger.warn("failed to send failure", e);
             }
+        } finally {
+            copiedRequest.decRef();
         }
     }
 

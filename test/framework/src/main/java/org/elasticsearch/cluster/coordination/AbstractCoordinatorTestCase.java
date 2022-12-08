@@ -1395,13 +1395,13 @@ public class AbstractCoordinatorTestCase extends ESTestCase {
                     public void run() {
                         if (clusterNodes.contains(ClusterNode.this)) {
                             wrapped.run();
-                        } else if (runnable instanceof DisruptableMockTransport.RebootSensitiveRunnable) {
+                        } else if (runnable instanceof DisruptableMockTransport.RebootSensitiveRunnable rebootSensitiveRunnable) {
                             logger.trace(
                                 "completing reboot-sensitive runnable {} from node {} as node has been removed from cluster",
                                 runnable,
                                 localNode
                             );
-                            ((DisruptableMockTransport.RebootSensitiveRunnable) runnable).ifRebooted();
+                            rebootSensitiveRunnable.ifRebooted();
                         } else {
                             logger.trace("ignoring runnable {} from node {} as node has been removed from cluster", runnable, localNode);
                         }

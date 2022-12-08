@@ -100,8 +100,14 @@ public class MockTransport extends StubbableTransport {
                 );
             } catch (IOException | UnsupportedOperationException e) {
                 throw new AssertionError("failed to serialize/deserialize response " + response, e);
+            } finally {
+                response.decRef();
             }
-            transportResponseHandler.handleResponse(deliveredResponse);
+            try {
+                transportResponseHandler.handleResponse(deliveredResponse);
+            } finally {
+                deliveredResponse.decRef();
+            }
         }
     }
 
