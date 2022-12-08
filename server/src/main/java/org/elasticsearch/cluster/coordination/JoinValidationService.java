@@ -28,6 +28,7 @@ import org.elasticsearch.common.util.concurrent.EsRejectedExecutionException;
 import org.elasticsearch.core.AbstractRefCounted;
 import org.elasticsearch.core.RefCounted;
 import org.elasticsearch.core.Releasables;
+import org.elasticsearch.core.Strings;
 import org.elasticsearch.core.TimeValue;
 import org.elasticsearch.env.Environment;
 import org.elasticsearch.node.NodeClosedException;
@@ -360,8 +361,28 @@ public class JoinValidationService {
             }
             final var newBytes = new ReleasableBytesReference(
                 bytesStream.bytes(),
-                () -> Releasables.closeExpectNoException(bytesStream, () -> logger.info("--> serializeClusterState: release [{}]", id))
-            );
+                () -> Releasables.closeExpectNoException(bytesStream, () -> logRefChange(id, "release"))
+            ) {
+                @Override
+                public void incRef() {
+                    logRefChange(id, "incRef");
+                    super.incRef();
+                }
+
+                @Override
+                public boolean tryIncRef() {
+                    final var result = super.tryIncRef();
+                    logRefChange(id, "tryIncRef[" + result + "]");
+                    return result;
+                }
+
+                @Override
+                public boolean decRef() {
+                    final var result = super.decRef();
+                    logRefChange(id, "decRef[" + result + "]");
+                    return result;
+                }
+            };
             logger.trace(
                 "serialized join validation cluster state version [{}] for node version [{}] with size [{}]",
                 clusterState.version(),
@@ -370,7 +391,7 @@ public class JoinValidationService {
             );
             final var previousBytes = statesByVersion.put(version, newBytes);
             assert previousBytes == null;
-            logger.info("--> serializeClusterState: acquire [{}]", id);
+            logRefChange(id, "acquire");
             success = true;
             return newBytes;
         } finally {
@@ -379,5 +400,9 @@ public class JoinValidationService {
                 assert false;
             }
         }
+    }
+
+    private static void logRefChange(long id, String action) {
+        logger.info(() -> Strings.format("--> serializeClusterState: %s [%d]", action, id), new ElasticsearchException("stack trace"));
     }
 }
