@@ -1633,7 +1633,7 @@ public class CoordinatorTests extends AbstractCoordinatorTestCase {
 
     @TestLogging(
         reason = "test includes assertions about JoinHelper logging",
-        value = "org.elasticsearch.cluster.coordination.JoinHelper:INFO"
+        value = "org.elasticsearch:INFO,org.elasticsearch.common.util.concurrent.DeterministicTaskQueue:TRACE"
     )
     public void testCannotJoinClusterWithDifferentUUID() {
         try (Cluster cluster1 = new Cluster(randomIntBetween(1, 3))) {

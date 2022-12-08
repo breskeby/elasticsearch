@@ -27,6 +27,7 @@ import org.elasticsearch.common.util.concurrent.AbstractRunnable;
 import org.elasticsearch.common.util.concurrent.EsRejectedExecutionException;
 import org.elasticsearch.core.AbstractRefCounted;
 import org.elasticsearch.core.RefCounted;
+import org.elasticsearch.core.Releasables;
 import org.elasticsearch.core.TimeValue;
 import org.elasticsearch.env.Environment;
 import org.elasticsearch.node.NodeClosedException;
@@ -45,6 +46,7 @@ import java.util.Objects;
 import java.util.Queue;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.BiConsumer;
 import java.util.function.Supplier;
 
@@ -337,7 +339,10 @@ public class JoinValidationService {
         }
     }
 
+    private static final AtomicLong idGenerator = new AtomicLong();
+
     private ReleasableBytesReference serializeClusterState(DiscoveryNode discoveryNode) {
+        final var id = idGenerator.incrementAndGet();
         final var bytesStream = transportService.newNetworkBytesStream();
         var success = false;
         try {
@@ -353,7 +358,10 @@ public class JoinValidationService {
             } catch (IOException e) {
                 throw new ElasticsearchException("failed to serialize cluster state for publishing to node {}", e, discoveryNode);
             }
-            final var newBytes = new ReleasableBytesReference(bytesStream.bytes(), bytesStream);
+            final var newBytes = new ReleasableBytesReference(
+                bytesStream.bytes(),
+                () -> Releasables.closeExpectNoException(bytesStream, () -> logger.info("--> serializeClusterState: release [{}]", id))
+            );
             logger.trace(
                 "serialized join validation cluster state version [{}] for node version [{}] with size [{}]",
                 clusterState.version(),
@@ -362,6 +370,7 @@ public class JoinValidationService {
             );
             final var previousBytes = statesByVersion.put(version, newBytes);
             assert previousBytes == null;
+            logger.info("--> serializeClusterState: acquire [{}]", id);
             success = true;
             return newBytes;
         } finally {
