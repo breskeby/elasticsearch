@@ -22,10 +22,12 @@ public class BwcGitExtension {
     private Provider<Version> bwcVersion;
     private Provider<String> bwcBranch;
     private Property<File> checkoutDir;
+    private Provider<String> refSpec;
 
     @Inject
     public BwcGitExtension(ObjectFactory objectFactory) {
         this.checkoutDir = objectFactory.property(File.class);
+        this.refSpec = objectFactory.property(String.class);
     }
 
     public Provider<Version> getBwcVersion() {
@@ -46,5 +48,9 @@ public class BwcGitExtension {
 
     public Property<File> getCheckoutDir() {
         return checkoutDir;
+    }
+
+    public Provider<String> getRefSpec() {
+        return refSpec;
     }
 }

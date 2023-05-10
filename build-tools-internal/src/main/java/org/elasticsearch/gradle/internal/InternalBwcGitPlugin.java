@@ -18,6 +18,7 @@ import org.gradle.api.Task;
 import org.gradle.api.file.ProjectLayout;
 import org.gradle.api.logging.Logger;
 import org.gradle.api.plugins.ExtraPropertiesExtension;
+import org.gradle.api.provider.Property;
 import org.gradle.api.provider.Provider;
 import org.gradle.api.provider.ProviderFactory;
 import org.gradle.api.tasks.TaskContainer;
@@ -65,17 +66,18 @@ public class InternalBwcGitPlugin implements Plugin<Project> {
     public void apply(Project project) {
         this.gitExtension = project.getExtensions().create("bwcGitConfig", BwcGitExtension.class);
         Provider<String> remote = providerFactory.systemProperty("bwc.remote").orElse("elastic");
+        Property<File> checkoutDir = gitExtension.getCheckoutDir();
 
         TaskContainer tasks = project.getTasks();
         TaskProvider<LoggedExec> createCloneTaskProvider = tasks.register("createClone", LoggedExec.class, createClone -> {
             createClone.onlyIf("git checkout dir missing", task -> this.gitExtension.getCheckoutDir().get().exists() == false);
-            createClone.commandLine("git", "clone", buildLayout.getRootDirectory(), gitExtension.getCheckoutDir().get());
+            createClone.commandLine("git", "clone", buildLayout.getRootDirectory(), checkoutDir.get());
         });
 
         ExtraPropertiesExtension extraProperties = project.getExtensions().getExtraProperties();
         TaskProvider<LoggedExec> findRemoteTaskProvider = tasks.register("findRemote", LoggedExec.class, findRemote -> {
             findRemote.dependsOn(createCloneTaskProvider);
-            findRemote.getWorkingDir().set(gitExtension.getCheckoutDir());
+            findRemote.getWorkingDir().set(checkoutDir);
             findRemote.commandLine("git", "remote", "-v");
             findRemote.getCaptureOutput().set(true);
             findRemote.doLast(t -> { extraProperties.set("remoteExists", isRemoteAvailable(remote, findRemote.getOutput())); });
@@ -84,22 +86,26 @@ public class InternalBwcGitPlugin implements Plugin<Project> {
         TaskProvider<Task> addRemoteTaskProvider = tasks.register("addRemote", addRemote -> {
             addRemote.dependsOn(findRemoteTaskProvider);
             addRemote.onlyIf("remote exists", task -> ((boolean) extraProperties.get("remoteExists")) == false);
+            String rootProjectName = project.getRootProject().getName();
+            String remoteRepo = remote.get();
+
+            String remoteRepoUrl = providerFactory.systemProperty("testRemoteRepo")
+                .orElse(
+                    providerFactory.provider(
+                        () -> addRemote.getExtensions().getExtraProperties().has("remote")
+                            ? addRemote.getExtensions().getExtraProperties().get("remote").toString()
+                            : null
+                    )
+                )
+                .getOrElse("https://github.com/" + remoteRepo + "/" + rootProjectName);
+
             addRemote.doLast(new Action<Task>() {
                 @Override
                 public void execute(Task task) {
                     LoggedExec.exec(execOperations, spec -> {
-                        spec.setWorkingDir(gitExtension.getCheckoutDir());
-                        String remoteRepo = remote.get();
+                        spec.setWorkingDir(checkoutDir);
                         // for testing only we can override the base remote url
-                        String remoteRepoUrl = providerFactory.systemProperty("testRemoteRepo")
-                            .orElse(
-                                providerFactory.provider(
-                                    () -> addRemote.getExtensions().getExtraProperties().has("remote")
-                                        ? addRemote.getExtensions().getExtraProperties().get("remote").toString()
-                                        : null
-                                )
-                            )
-                            .getOrElse("https://github.com/" + remoteRepo + "/" + project.getRootProject().getName());
+
                         spec.commandLine("git", "remote", "add", remoteRepo, remoteRepoUrl);
                     });
                 }
@@ -119,7 +125,7 @@ public class InternalBwcGitPlugin implements Plugin<Project> {
             });
             fetchLatest.onlyIf("online and gitFetchLatest == true", t -> isOffline == false && gitFetchLatest.get());
             fetchLatest.dependsOn(addRemoteTaskProvider);
-            fetchLatest.getWorkingDir().set(gitExtension.getCheckoutDir());
+            fetchLatest.getWorkingDir().set(checkoutDir);
             // Fetch latest from remotes, including tags, overriding any existing local refs
             fetchLatest.commandLine("git", "fetch", "--all", "--tags", "--force");
         });
@@ -127,14 +133,16 @@ public class InternalBwcGitPlugin implements Plugin<Project> {
         String projectPath = project.getPath();
         TaskProvider<Task> checkoutBwcBranchTaskProvider = tasks.register("checkoutBwcBranch", checkoutBwcBranch -> {
             checkoutBwcBranch.dependsOn(fetchLatestTaskProvider);
+            String bwcBranch = gitExtension.getBwcBranch().get();
+            Provider<String> refSpec = gitExtension.getRefSpec();
             checkoutBwcBranch.doLast(new Action<Task>() {
                 @Override
                 public void execute(Task task) {
-                    File checkoutDir = gitExtension.getCheckoutDir().get();
-                    String bwcBranch = gitExtension.getBwcBranch().get();
                     final String refspec = providerFactory.systemProperty("bwc.refspec." + bwcBranch)
                         .orElse(providerFactory.systemProperty("tests.bwc.refspec." + bwcBranch))
+                        .orElse(providerFactory.provider(() -> refSpec.isPresent() ? refSpec.get() : null))
                         .orElse(
+                            // deprecated. Will go away once we have migrated serverless away from this task extension.
                             providerFactory.provider(
                                 () -> task.getExtensions().getExtraProperties().has("refspec")
                                     ? task.getExtensions().getExtraProperties().get("refspec").toString()
@@ -150,7 +158,7 @@ public class InternalBwcGitPlugin implements Plugin<Project> {
                         spec.commandLine("git", "checkout", "--recurse-submodules", effectiveRefSpec);
                     });
 
-                    String checkoutHash = GitInfo.gitInfo(checkoutDir).getRevision();
+                    String checkoutHash = GitInfo.gitInfo(checkoutDir.get()).getRevision();
                     task.getLogger().lifecycle("Checkout hash for {} is {}", projectPath, checkoutHash);
                     writeFile(projectLayout.getBuildDirectory().file("refspec").get().getAsFile(), checkoutHash);
                 }
