@@ -38,6 +38,7 @@ import org.gradle.api.tasks.Input;
 import org.gradle.api.tasks.InputDirectory;
 import org.gradle.api.tasks.InputFiles;
 import org.gradle.api.tasks.Internal;
+import org.gradle.api.tasks.Nested;
 import org.gradle.api.tasks.Optional;
 import org.gradle.api.tasks.OutputFile;
 import org.gradle.api.tasks.PathSensitive;
@@ -48,6 +49,7 @@ import org.gradle.api.tasks.VerificationException;
 import org.gradle.api.tasks.VerificationTask;
 import org.gradle.api.tasks.util.PatternFilterable;
 import org.gradle.api.tasks.util.PatternSet;
+import org.gradle.jvm.toolchain.JavaLauncher;
 import org.gradle.workers.WorkAction;
 import org.gradle.workers.WorkParameters;
 import org.gradle.workers.WorkQueue;
@@ -375,10 +377,18 @@ public abstract class CheckForbiddenApisTask extends DefaultTask implements Patt
     @Inject
     public abstract WorkerExecutor getWorkerExecutor();
 
+    @Nested
+    @Optional
+    abstract Property<JavaLauncher> getLauncher();
+
     /** Executes the forbidden apis task. */
     @TaskAction
     public void checkForbidden() {
-        WorkQueue workQueue = getWorkerExecutor().noIsolation();
+        WorkQueue workQueue = getLauncher().isPresent() ? getWorkerExecutor().processIsolation(processWorkerSpec -> {
+            processWorkerSpec.getClasspath().from(getClasspath());
+            processWorkerSpec.getForkOptions().setExecutable(getLauncher().get().getExecutablePath().getAsFile().getPath());
+        }) : getWorkerExecutor().noIsolation();
+
         workQueue.submit(ForbiddenApisCheckWorkAction.class, parameters -> {
             parameters.getClasspath().setFrom(getClasspath());
             parameters.getClassDirectories().setFrom(getClassesDirs());

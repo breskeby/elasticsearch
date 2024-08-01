@@ -25,6 +25,12 @@ configure(allprojects) {
         JvmVendorSpec.ORACLE :
         JvmVendorSpec.matching(VersionProperties.bundledJdkVendor)
     }
+  project.tasks.withType(JavaCompile).configureEach {
+      javaCompiler.convention(javaToolchains.compilerFor {
+        languageVersion = JavaLanguageVersion.of(17)
+        vendor = JvmVendorSpec.ORACLE
+      })
+  }
   project.tasks.withType(Test).configureEach { Test test ->
         if (BuildParams.getIsRuntimeJavaHomeSet()) {
             test.executable = "${BuildParams.runtimeJavaHome}/bin/java" +

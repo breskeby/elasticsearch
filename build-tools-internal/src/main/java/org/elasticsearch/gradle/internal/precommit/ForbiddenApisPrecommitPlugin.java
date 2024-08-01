@@ -17,14 +17,21 @@ import org.gradle.api.plugins.JavaBasePlugin;
 import org.gradle.api.specs.Specs;
 import org.gradle.api.tasks.SourceSetContainer;
 import org.gradle.api.tasks.TaskProvider;
+import org.gradle.jvm.toolchain.JavaLanguageVersion;
+import org.gradle.jvm.toolchain.JavaToolchainService;
 
 import java.io.File;
 import java.util.Set;
 
+import javax.inject.Inject;
+
 import static de.thetaphi.forbiddenapis.gradle.ForbiddenApisPlugin.FORBIDDEN_APIS_TASK_NAME;
 import static org.elasticsearch.gradle.internal.precommit.CheckForbiddenApisTask.BUNDLED_SIGNATURE_DEFAULTS;
 
-public class ForbiddenApisPrecommitPlugin extends PrecommitPlugin {
+public abstract class ForbiddenApisPrecommitPlugin extends PrecommitPlugin {
+
+    @Inject
+    protected abstract JavaToolchainService getJavaToolchainService();
 
     @Override
     public TaskProvider<? extends Task> createTask(Project project) {
@@ -50,6 +57,13 @@ public class ForbiddenApisPrecommitPlugin extends PrecommitPlugin {
         project.getExtensions().getByType(SourceSetContainer.class).configureEach(sourceSet -> {
             String sourceSetTaskName = sourceSet.getTaskName(FORBIDDEN_APIS_TASK_NAME, null);
             var sourceSetTask = project.getTasks().register(sourceSetTaskName, CheckForbiddenApisTask.class, t -> {
+                t.getLauncher()
+                    .set(
+                        getJavaToolchainService().launcherFor(
+                            spec -> spec.getLanguageVersion()
+                                .set(JavaLanguageVersion.of(BuildParams.getMinimumRuntimeVersion().getMajorVersion()))
+                        )
+                    );
                 t.setDescription("Runs forbidden-apis checks on '${sourceSet.name}' classes.");
                 t.setResourcesDir(resourcesDir);
                 t.getOutputs().upToDateWhen(Specs.SATISFIES_ALL);
