@@ -67,7 +67,7 @@ if (OS.current() == OS.WINDOWS) {
 
   int currentMajorVersion = org.elasticsearch.gradle.VersionProperties.elasticsearchVersion.major
   assert (currentMajorVersion - 2) == 7 : "add archive BWC tests for major version " + (currentMajorVersion - 2)
-  for (String versionString : ['5.0.0', '5.6.16', '6.0.0', '6.8.20']) {
+  for (String versionString : ['5.0.0', '5.6.16', '6.0.0', '6.8.20', '7.17.25']) {
     Version version = Version.fromString(versionString)
     String packageName = 'org.elasticsearch.distribution.zip'
     String artifact = "${packageName}:elasticsearch:${version}@zip"
@@ -96,42 +96,63 @@ if (OS.current() == OS.WINDOWS) {
       setting 'xpack.searchable.snapshot.shared_cache.region_size', '256KB'
     }
 
-    TaskProvider<AntFixture> fixture = tasks.register("oldES${versionNoDots}Fixture", AntFixture) {
-      dependsOn project.configurations.oldesFixture, jdks.legacy, config
-      executable = "${BuildParams.runtimeJavaHome}/bin/java"
-      env 'CLASSPATH', "${-> project.configurations.oldesFixture.asPath}"
-      // old versions of Elasticsearch need JAVA_HOME
-      env 'JAVA_HOME', jdks.legacy.javaHomePath
-      // If we are running on certain arm systems we need to explicitly set the stack size to overcome JDK page size bug
-      if (Architecture.current() == Architecture.AARCH64) {
-        env 'ES_JAVA_OPTS', '-Xss512k'
+    if(version.onOrAfter('7.0.0')) {
+      def oldCluster = testClusters.register("oldES${versionNoDots}Cluster") {
+        testDistribution = 'DEFAULT'
+        numberOfNodes = 1
+        versions = [versionString]
+
+        setting 'path.repo', repoLocation, IGNORE_VALUE
+        setting 'xpack.license.self_generated.type', 'trial'
+
+        setting 'xpack.security.enabled', 'true'
+        user username: 'admin', password: 'admin-password', role: 'superuser'
+
+        setting 'xpack.searchable.snapshot.shared_cache.size', '16MB'
+        setting 'xpack.searchable.snapshot.shared_cache.region_size', '256KB'
       }
-      def dataPath = "${baseDir}/data"
-      args 'oldes.OldElasticsearch',
-        baseDir,
-        "${ -> config.getSingleFile().toPath()}",
-        false,
-        "path.repo: ${repoLocation}",
-        "path.data: ${dataPath}"
-      if ((version.onOrAfter('6.8.0') && Architecture.current() == Architecture.AARCH64) || (version.onOrAfter("6.4.0") && BwcVersions.isMlCompatible(version) == false)) {
-        // We need to explicitly disable ML when running old ES versions on ARM or on systems with newer GLIBC
-        args 'xpack.ml.enabled: false'
-      }
-      doFirst {
-        delete(dataPath)
-        mkdir(dataPath)
-      }
-      maxWaitInSeconds 60
-      waitCondition = { fixture, ant ->
-        // the fixture writes the ports file when Elasticsearch's HTTP service
-        // is ready, so we can just wait for the file to exist
-        return fixture.portsFile.exists()
-      }
+    } else {
+      TaskProvider<AntFixture> fixture = tasks.register("oldES${versionNoDots}Fixture", AntFixture) {
+            dependsOn project.configurations.oldesFixture, jdks.legacy, config
+            executable = "${BuildParams.runtimeJavaHome}/bin/java"
+            env 'CLASSPATH', "${-> project.configurations.oldesFixture.asPath}"
+            // old versions of Elasticsearch need JAVA_HOME
+            env 'JAVA_HOME', jdks.legacy.javaHomePath
+            // If we are running on certain arm systems we need to explicitly set the stack size to overcome JDK page size bug
+            if (Architecture.current() == Architecture.AARCH64) {
+              env 'ES_JAVA_OPTS', '-Xss512k'
+            }
+            def dataPath = "${baseDir}/data"
+            args 'oldes.OldElasticsearch',
+              baseDir,
+              "${ -> config.getSingleFile().toPath()}",
+              false,
+              "path.repo: ${repoLocation}",
+              "path.data: ${dataPath}"
+            if ((version.onOrAfter('6.8.0') && Architecture.current() == Architecture.AARCH64) || (version.onOrAfter("6.4.0") && BwcVersions.isMlCompatible(version) == false)) {
+              // We need to explicitly disable ML when running old ES versions on ARM or on systems with newer GLIBC
+              args 'xpack.ml.enabled: false'
+            }
+            doFirst {
+              delete(dataPath)
+              mkdir(dataPath)
+            }
+            maxWaitInSeconds 60
+            waitCondition = { fixture, ant ->
+              // the fixture writes the ports file when Elasticsearch's HTTP service
+              // is ready, so we can just wait for the file to exist
+              return fixture.portsFile.exists()
+            }
+          }
     }
 
     tasks.register("javaRestTestBeforeRestart#${versionNoDots}", StandaloneRestIntegTestTask) {
       useCluster testClusterProvider
-      dependsOn fixture
+      if(version.onOrAfter('7.0.0')) {
+        useCluster testClusters.named("oldES${versionNoDots}Cluster")
+      } else {
+        dependsOn tasks.named("oldES${versionNoDots}Fixture")
+      }
       doFirst {
         delete(repoLocation)
         mkdir(repoLocation)
@@ -150,14 +171,29 @@ if (OS.current() == OS.WINDOWS) {
       }
     }
 
+
     tasks.matching { it.name.startsWith("javaRestTest") && it.name.endsWith(versionNoDots) }.configureEach {
+      doFirst {
+        def oldClusterPortProvider = testClusters.named("oldES${versionNoDots}Cluster").map { cluster ->
+          def local = cluster.allHttpSocketURI.find { it.startsWith("127.0.0.1")}
+          return local.substring(local.lastIndexOf(':') + 1)
+        }
+        it.nonInputProperties.systemProperty "tests.es.port", "${-> oldClusterPortProvider.get()}"
+
+        println "oldClusterPortProvider " + oldClusterPortProvider.get()
+        println "allRemoteAccessPortURI " + testClusters.named("oldES${versionNoDots}Cluster").get().allRemoteAccessPortURI
+        println "allHttpSocketURI " + testClusters.named("oldES${versionNoDots}Cluster").get().allHttpSocketURI
+        println "httpSocketURI " + testClusters.named("oldES${versionNoDots}Cluster").get().httpSocketURI
+      }
       it.nonInputProperties.systemProperty "tests.repo.location", repoLocation
       it.systemProperty "tests.es.version", version.toString()
 
       /* Use a closure on the string to delay evaluation until right before we
        * run the integration tests so that we can be sure that the file is
        * ready. */
-      it.nonInputProperties.systemProperty "tests.es.port", "${-> fixture.get().addressAndPort}"
+
+      //it.nonInputProperties.systemProperty "tests.es.port", "${-> fixture.get().addressAndPort}"
+//      it.nonInputProperties.systemProperty "tests.es.port", "${-> testClusters.named("oldES${versionNoDots}Cluster").get().allRemoteAccessPortURI.join(',')}"
       it.nonInputProperties.systemProperty('tests.rest.cluster', "${-> testClusterProvider.get().allHttpSocketURI.join(",")}")
       it.nonInputProperties.systemProperty('tests.clustername', "${-> testClusterProvider.get().getName()}")
     }

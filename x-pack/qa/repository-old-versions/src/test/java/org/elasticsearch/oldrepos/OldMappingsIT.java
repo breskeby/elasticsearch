@@ -9,7 +9,9 @@ package org.elasticsearch.oldrepos;
 
 import com.carrotsearch.randomizedtesting.RandomizedTest;
 
+import org.apache.http.Header;
 import org.apache.http.HttpHost;
+import org.apache.http.message.BasicHeader;
 import org.elasticsearch.Version;
 import org.elasticsearch.client.Request;
 import org.elasticsearch.client.RequestOptions;
@@ -84,10 +86,9 @@ public class OldMappingsIT extends ESRestTestCase {
             indices = Arrays.asList("filebeat", "custom", "nested");
         }
 
-        int oldEsPort = Integer.parseInt(System.getProperty("tests.es.port"));
-        try (RestClient oldEs = RestClient.builder(new HttpHost("127.0.0.1", oldEsPort)).build()) {
 
-            assertOK(oldEs.performRequest(createIndex("filebeat", "filebeat.json")));
+        try (RestClient oldEs = createOldESClient()) {
+//            assertOK(oldEs.performRequest(createIndex("filebeat", "filebeat.json")));
             if (oldVersion.before(Version.fromString("6.0.0"))) {
                 assertOK(oldEs.performRequest(createIndex("winlogbeat", "winlogbeat.json")));
             }
@@ -167,6 +168,19 @@ public class OldMappingsIT extends ESRestTestCase {
         createRestoreRequest.setJsonEntity("{\"indices\":\"" + indices.stream().collect(Collectors.joining(",")) + "\"}");
         createRestoreRequest.setOptions(RequestOptions.DEFAULT.toBuilder().setWarningsHandler(WarningsHandler.PERMISSIVE));
         assertOK(client().performRequest(createRestoreRequest));
+    }
+
+    private RestClient createOldESClient() {
+        int oldEsPort = Integer.parseInt(System.getProperty("tests.es.port"));
+        System.out.println("oldEsPort = " + oldEsPort);
+        Settings settings = restClientSettings();
+        Map<String, String> headers = ThreadContext.buildDefaultHeaders(settings);
+        Header[] defaultHeaders = new Header[headers.size()];
+        int i = 0;
+        for (Map.Entry<String, String> entry : headers.entrySet()) {
+            defaultHeaders[i++] = new BasicHeader(entry.getKey(), entry.getValue());
+        }
+        return RestClient.builder(new HttpHost("127.0.0.1", oldEsPort)).setDefaultHeaders(defaultHeaders).build();
     }
 
     private Request createIndex(String indexName, String file) throws IOException {
