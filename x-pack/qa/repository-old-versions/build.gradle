@@ -16,8 +16,11 @@ import static org.elasticsearch.gradle.PropertyNormalization.IGNORE_VALUE
 
 apply plugin: 'elasticsearch.jdk-download'
 apply plugin: 'elasticsearch.internal-testclusters'
-apply plugin: 'elasticsearch.standalone-rest-test'
+//apply plugin: 'elasticsearch.standalone-rest-test'
+apply plugin: 'elasticsearch.internal-java-rest-test'
+
 apply plugin: 'elasticsearch.rest-resources'
+
 
 configurations {
   oldesFixture
@@ -179,6 +182,13 @@ if (OS.current() == OS.WINDOWS) {
     tasks.named("check").configure {
       dependsOn "javaRestTestAfterRestart#${versionNoDots}"
     }
+  }
+
+  tasks.named("javaRestTest").configure {
+    dependsOn jdks.legacy
+    usesBwcDistribution(Version.fromString("7.17.20"))
+    usesBwcDistribution(Version.fromString("6.0.0"))
+    environment 'JAVA_HOME', jdks.legacy.javaHomePath
   }
 }
 
