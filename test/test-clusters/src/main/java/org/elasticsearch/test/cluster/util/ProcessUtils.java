@@ -70,8 +70,7 @@ public final class ProcessUtils {
         processBuilder.environment().putAll(environment);
 
         try {
-            process = processBuilder.start();
-
+            process = processBuilder.inheritIO().start();;
             startLoggingThread(
                 process.getInputStream(),
                 inheritIO ? System.out::println : PROCESS_LOGGER::info,

@@ -169,7 +169,7 @@ public abstract class AbstractLocalClusterFactory<S extends LocalClusterSpec, H 
             if (usesSecureSecretsFile) {
                 writeSecureSecretsFile();
             } else {
-                createKeystore();
+//                createKeystore();
                 addKeystoreSettings();
                 addKeystoreFiles();
             }
@@ -274,6 +274,15 @@ public abstract class AbstractLocalClusterFactory<S extends LocalClusterSpec, H 
             try {
                 Retry.retryUntilTrue(NODE_UP_TIMEOUT, Duration.ofMillis(500), () -> {
                     if (process.isAlive() == false) {
+//                        try (var reader = process.errorReader()) {
+//                            String line;
+//                            while ((line = reader.readLine()) != null) {
+//                                System.out.println("LINE " + line);
+//                            }
+//                        } catch (IOException e) {
+//                            throw new UncheckedIOException("Error reading output from process.", e);
+//                        }
+                        System.out.println("process.exitValue() = " + process.exitValue());
                         throw new RuntimeException(
                             "Elasticsearch process died while waiting for ports file. See console output for details."
                         );
@@ -422,9 +431,9 @@ public abstract class AbstractLocalClusterFactory<S extends LocalClusterSpec, H 
                 String content = Files.readString(jvmOptionsFile);
                 Map<String, String> expansions = getJvmOptionsReplacements();
                 for (String key : expansions.keySet()) {
-                    if (content.contains(key) == false) {
-                        throw new IOException("Template property '" + key + "' not found in template.");
-                    }
+//                    if (content.contains(key) == false) {
+//                        throw new IOException("Template property '" + key + "' not found in template.");
+//                    }
                     content = content.replace(key, expansions.get(key));
                 }
                 Files.writeString(jvmOptionsFile, content);
@@ -714,6 +723,7 @@ public abstract class AbstractLocalClusterFactory<S extends LocalClusterSpec, H 
                 getEnvironmentVariables(),
                 true
             );
+
 
             ProcessReaper.instance().registerPid(getServiceName(), process.pid());
         }
