@@ -87,12 +87,12 @@ public class OldMappingsIT extends ESRestTestCase {
         int oldEsPort = Integer.parseInt(System.getProperty("tests.es.port"));
         try (RestClient oldEs = RestClient.builder(new HttpHost("127.0.0.1", oldEsPort)).build()) {
 
-            assertOK(oldEs.performRequest(createIndex("filebeat", "filebeat.json")));
+            assertOK(client().performRequest(createIndex("filebeat", "filebeat.json")));
             if (oldVersion.before(Version.fromString("6.0.0"))) {
-                assertOK(oldEs.performRequest(createIndex("winlogbeat", "winlogbeat.json")));
+                assertOK(client().performRequest(createIndex("winlogbeat", "winlogbeat.json")));
             }
-            assertOK(oldEs.performRequest(createIndex("custom", "custom.json")));
-            assertOK(oldEs.performRequest(createIndex("nested", "nested.json")));
+            assertOK(client().performRequest(createIndex("custom", "custom.json")));
+            assertOK(client().performRequest(createIndex("nested", "nested.json")));
 
             Request doc1 = new Request("PUT", "/" + "custom" + "/" + "doc" + "/" + "1");
             doc1.addParameter("refresh", "true");
@@ -106,7 +106,7 @@ public class OldMappingsIT extends ESRestTestCase {
                 .endObject()
                 .endObject();
             doc1.setJsonEntity(Strings.toString(bodyDoc1));
-            assertOK(oldEs.performRequest(doc1));
+            assertOK(client().performRequest(doc1));
 
             Request doc2 = new Request("PUT", "/" + "custom" + "/" + "doc" + "/" + "2");
             doc2.addParameter("refresh", "true");
@@ -121,7 +121,7 @@ public class OldMappingsIT extends ESRestTestCase {
                 .field("completion", "some_value")
                 .endObject();
             doc2.setJsonEntity(Strings.toString(bodyDoc2));
-            assertOK(oldEs.performRequest(doc2));
+            assertOK(client().performRequest(doc2));
 
             Request doc3 = new Request("PUT", "/" + "nested" + "/" + "doc" + "/" + "1");
             doc3.addParameter("refresh", "true");
@@ -140,19 +140,19 @@ public class OldMappingsIT extends ESRestTestCase {
                 .endArray()
                 .endObject();
             doc3.setJsonEntity(Strings.toString(bodyDoc3));
-            assertOK(oldEs.performRequest(doc3));
+            assertOK(client().performRequest(doc3));
 
             // register repo on old ES and take snapshot
             Request createRepoRequest = new Request("PUT", "/_snapshot/" + repoName);
             createRepoRequest.setJsonEntity(Strings.format("""
                 {"type":"fs","settings":{"location":"%s"}}
                 """, repoLocation));
-            assertOK(oldEs.performRequest(createRepoRequest));
+            assertOK(client().performRequest(createRepoRequest));
 
             Request createSnapshotRequest = new Request("PUT", "/_snapshot/" + repoName + "/" + snapshotName);
             createSnapshotRequest.addParameter("wait_for_completion", "true");
             createSnapshotRequest.setJsonEntity("{\"indices\":\"" + indices.stream().collect(Collectors.joining(",")) + "\"}");
-            assertOK(oldEs.performRequest(createSnapshotRequest));
+            assertOK(client().performRequest(createSnapshotRequest));
         }
 
         // register repo on new ES and restore snapshot

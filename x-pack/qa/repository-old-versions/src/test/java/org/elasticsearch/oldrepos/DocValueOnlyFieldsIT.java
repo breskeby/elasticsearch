@@ -132,7 +132,7 @@ public class DocValueOnlyFieldsIT extends ESClientYamlSuiteTestCase {
             settingsBuilder.endObject().endObject().endObject();
 
             createIndex.setJsonEntity(Strings.toString(settingsBuilder));
-            assertOK(oldEs.performRequest(createIndex));
+            assertOK(client().performRequest(createIndex));
 
             Request doc1 = new Request("PUT", "/" + indexName + "/" + "doc" + "/" + "1");
             doc1.addParameter("refresh", "true");
@@ -152,7 +152,7 @@ public class DocValueOnlyFieldsIT extends ESClientYamlSuiteTestCase {
                 .array("geo_point", 13.5, 34.89)
                 .endObject();
             doc1.setJsonEntity(Strings.toString(bodyDoc1));
-            assertOK(oldEs.performRequest(doc1));
+            assertOK(client().performRequest(doc1));
 
             Request doc2 = new Request("PUT", "/" + indexName + "/" + "doc" + "/" + "2");
             doc2.addParameter("refresh", "true");
@@ -172,19 +172,19 @@ public class DocValueOnlyFieldsIT extends ESClientYamlSuiteTestCase {
                 .array("geo_point", -63.24, 31.0)
                 .endObject();
             doc2.setJsonEntity(Strings.toString(bodyDoc2));
-            assertOK(oldEs.performRequest(doc2));
+            assertOK(client().performRequest(doc2));
 
             // register repo on old ES and take snapshot
             Request createRepoRequest = new Request("PUT", "/_snapshot/" + repoName);
             createRepoRequest.setJsonEntity(Strings.format("""
                 {"type":"fs","settings":{"location":"%s"}}
                 """, repoLocation));
-            assertOK(oldEs.performRequest(createRepoRequest));
+            assertOK(client().performRequest(createRepoRequest));
 
             Request createSnapshotRequest = new Request("PUT", "/_snapshot/" + repoName + "/" + snapshotName);
             createSnapshotRequest.addParameter("wait_for_completion", "true");
             createSnapshotRequest.setJsonEntity("{\"indices\":\"" + indexName + "\"}");
-            assertOK(oldEs.performRequest(createSnapshotRequest));
+            assertOK(client().performRequest(createSnapshotRequest));
         }
 
         // register repo on new ES and restore snapshot

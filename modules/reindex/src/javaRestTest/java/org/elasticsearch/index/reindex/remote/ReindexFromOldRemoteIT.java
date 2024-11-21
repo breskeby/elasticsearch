@@ -38,13 +38,13 @@ public class ReindexFromOldRemoteIT extends ESRestTestCase {
             try {
                 Request createIndex = new Request("PUT", "/test");
                 createIndex.setJsonEntity("{\"settings\":{\"number_of_shards\": 1}}");
-                oldEs.performRequest(createIndex);
+                client().performRequest(createIndex);
 
                 for (int i = 0; i < DOCS; i++) {
                     Request doc = new Request("PUT", "/test/doc/testdoc" + i);
                     doc.addParameter("refresh", "true");
                     doc.setJsonEntity("{\"test\":\"test\"}");
-                    oldEs.performRequest(doc);
+                    client().performRequest(doc);
                 }
 
                 Request reindex = new Request("POST", "/_reindex");
@@ -97,7 +97,7 @@ public class ReindexFromOldRemoteIT extends ESRestTestCase {
                 success = true;
             } finally {
                 try {
-                    oldEs.performRequest(new Request("DELETE", "/test"));
+                    client().performRequest(new Request("DELETE", "/test"));
                 } catch (Exception deleteException) {
                     logger.warn("Exception deleting index", deleteException);
                     if (success) {

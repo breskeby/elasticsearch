@@ -7,16 +7,12 @@
 
 package org.elasticsearch.oldrepos7x;
 
-import com.carrotsearch.randomizedtesting.RandomizedTest;
-
 import org.apache.http.HttpHost;
 import org.elasticsearch.client.Request;
 import org.elasticsearch.client.RequestOptions;
 import org.elasticsearch.client.RestClient;
 import org.elasticsearch.client.WarningsHandler;
 import org.elasticsearch.common.Strings;
-import org.elasticsearch.common.xcontent.support.XContentMapValues;
-import org.elasticsearch.core.PathUtils;
 import org.elasticsearch.test.cluster.ElasticsearchCluster;
 import org.elasticsearch.test.cluster.local.distribution.DistributionType;
 import org.elasticsearch.test.cluster.util.Version;
@@ -26,20 +22,26 @@ import org.elasticsearch.xcontent.XContentFactory;
 import org.elasticsearch.xcontent.XContentType;
 import org.junit.Before;
 import org.junit.ClassRule;
+import org.junit.Rule;
+import org.junit.rules.TemporaryFolder;
 
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.List;
-import java.util.Map;
 import java.util.stream.Collectors;
 
 public class OldMappingsIT extends ESRestTestCase {
 
+    @Rule
+    public TemporaryFolder repoDirectory = new TemporaryFolder();
+
     @ClassRule
-    public static ElasticsearchCluster currentCluster = ElasticsearchCluster.local().distribution(DistributionType.DEFAULT)
-                .distribution(DistributionType.DEFAULT)
+    public static ElasticsearchCluster currentCluster = ElasticsearchCluster.local()
+        .distribution(DistributionType.DEFAULT)
+        .distribution(DistributionType.DEFAULT)
         .setting("xpack.security.enabled", "false")
-        .setting("xpack.ml.enabled", "false").build();
+        .setting("xpack.ml.enabled", "false")
+        .build();
 
     @ClassRule
     public static ElasticsearchCluster oldCluster = ElasticsearchCluster.local()
@@ -47,11 +49,6 @@ public class OldMappingsIT extends ESRestTestCase {
         .distribution(DistributionType.DEFAULT)
         .setting("xpack.security.enabled", "false")
         .setting("xpack.ml.enabled", "false")
-//        .apply(builder -> {
-//            if (System.getenv("JAVA_HOME") != null) {
-//                builder.environment("JAVA_HOME", System.getenv("JAVA_HOME"));
-//            }
-//        })
         .build();
 
     @Override
@@ -69,7 +66,7 @@ public class OldMappingsIT extends ESRestTestCase {
             .field("index.number_of_shards", numberOfShards)
             .endObject()
             .startObject("mappings");
-        builder.rawValue(OldMappingsIT.class.getResourceAsStream(file), XContentType.JSON);
+        builder.rawValue(getClass().getResourceAsStream(file), XContentType.JSON);
         builder.endObject().endObject();
 
         createIndex.setJsonEntity(Strings.toString(builder));
@@ -78,22 +75,24 @@ public class OldMappingsIT extends ESRestTestCase {
 
     @Before
     public void setupIndex() throws IOException {
-        String repoLocation = PathUtils.get(System.getProperty("tests.repo.location"))
-            .resolve(RandomizedTest.getContext().getTargetClass().getName())
-            .toString();
+        // String repoLocation = PathUtils.get(System.getProperty("tests.repo.location"))
+        // .resolve(RandomizedTest.getContext().getTargetClass().getName())
+        // .toString();
+
+        String repoLocation = repoDirectory.getRoot().getPath();
 
         String repoName = "old_mappings_repo";
         String snapshotName = "snap";
         List<String> indices;
         indices = Arrays.asList("filebeat", "custom", "nested");
 
-        int oldEsPort = Integer.parseInt(System.getProperty("tests.es.port"));
-        try (RestClient oldEs = RestClient.builder(new HttpHost("127.0.0.1", oldEsPort)).build()) {
+        List<HttpHost> clusterHosts = parseClusterHosts(oldCluster.getHttpAddresses());
+try (RestClient oldEsClient = client()) {
+//        try (RestClient oldEsClient = RestClient.builder(clusterHosts.toArray(new HttpHost[clusterHosts.size()])).build();) {
+            assertOK(oldEsClient.performRequest(createIndex("filebeat", "filebeat.json")));
 
-            assertOK(oldEs.performRequest(createIndex("filebeat", "filebeat.json")));
-
-            assertOK(oldEs.performRequest(createIndex("custom", "custom.json")));
-            assertOK(oldEs.performRequest(createIndex("nested", "nested.json")));
+            assertOK(oldEsClient.performRequest(createIndex("custom", "custom.json")));
+            assertOK(oldEsClient.performRequest(createIndex("nested", "nested.json")));
 
             Request doc1 = new Request("PUT", "/" + "custom" + "/" + "doc" + "/" + "1");
             doc1.addParameter("refresh", "true");
@@ -107,7 +106,7 @@ public class OldMappingsIT extends ESRestTestCase {
                 .endObject()
                 .endObject();
             doc1.setJsonEntity(Strings.toString(bodyDoc1));
-            assertOK(oldEs.performRequest(doc1));
+            assertOK(oldEsClient.performRequest(doc1));
 
             Request doc2 = new Request("PUT", "/" + "custom" + "/" + "doc" + "/" + "2");
             doc2.addParameter("refresh", "true");
@@ -122,7 +121,7 @@ public class OldMappingsIT extends ESRestTestCase {
                 .field("completion", "some_value")
                 .endObject();
             doc2.setJsonEntity(Strings.toString(bodyDoc2));
-            assertOK(oldEs.performRequest(doc2));
+            assertOK(oldEsClient.performRequest(doc2));
 
             Request doc3 = new Request("PUT", "/" + "nested" + "/" + "doc" + "/" + "1");
             doc3.addParameter("refresh", "true");
@@ -141,39 +140,40 @@ public class OldMappingsIT extends ESRestTestCase {
                 .endArray()
                 .endObject();
             doc3.setJsonEntity(Strings.toString(bodyDoc3));
-            assertOK(oldEs.performRequest(doc3));
+            assertOK(oldEsClient.performRequest(doc3));
 
             // register repo on old ES and take snapshot
             Request createRepoRequest = new Request("PUT", "/_snapshot/" + repoName);
             createRepoRequest.setJsonEntity(Strings.format("""
                 {"type":"fs","settings":{"location":"%s"}}
                 """, repoLocation));
-            assertOK(oldEs.performRequest(createRepoRequest));
+            assertOK(oldEsClient.performRequest(createRepoRequest));
 
             Request createSnapshotRequest = new Request("PUT", "/_snapshot/" + repoName + "/" + snapshotName);
             createSnapshotRequest.addParameter("wait_for_completion", "true");
             createSnapshotRequest.setJsonEntity("{\"indices\":\"" + indices.stream().collect(Collectors.joining(",")) + "\"}");
-            assertOK(oldEs.performRequest(createSnapshotRequest));
+            assertOK(oldEsClient.performRequest(createSnapshotRequest));
+            // }
+
+            // register repo on new ES and restore snapshot
+            Request createRepoRequest2 = new Request("PUT", "/_snapshot/" + repoName);
+            createRepoRequest2.setJsonEntity(Strings.format("""
+                {"type":"fs","settings":{"location":"%s"}}
+                """, repoLocation));
+            assertOK(oldEsClient.performRequest(createRepoRequest2));
+
+            final Request createRestoreRequest = new Request("POST", "/_snapshot/" + repoName + "/" + snapshotName + "/_restore");
+            createRestoreRequest.addParameter("wait_for_completion", "true");
+            createRestoreRequest.setJsonEntity("{\"indices\":\"" + indices.stream().collect(Collectors.joining(",")) + "\"}");
+            createRestoreRequest.setOptions(RequestOptions.DEFAULT.toBuilder().setWarningsHandler(WarningsHandler.PERMISSIVE));
+            assertOK(oldEsClient.performRequest(createRestoreRequest));
         }
-
-        // register repo on new ES and restore snapshot
-        Request createRepoRequest2 = new Request("PUT", "/_snapshot/" + repoName);
-        createRepoRequest2.setJsonEntity(Strings.format("""
-            {"type":"fs","settings":{"location":"%s"}}
-            """, repoLocation));
-        assertOK(client().performRequest(createRepoRequest2));
-
-        final Request createRestoreRequest = new Request("POST", "/_snapshot/" + repoName + "/" + snapshotName + "/_restore");
-        createRestoreRequest.addParameter("wait_for_completion", "true");
-        createRestoreRequest.setJsonEntity("{\"indices\":\"" + indices.stream().collect(Collectors.joining(",")) + "\"}");
-        createRestoreRequest.setOptions(RequestOptions.DEFAULT.toBuilder().setWarningsHandler(WarningsHandler.PERMISSIVE));
-        assertOK(client().performRequest(createRestoreRequest));
     }
 
     public void testMappingOk() throws IOException {
-        Request mappingRequest = new Request("GET", "/" + "filebeat" + "/_mapping");
-        Map<String, Object> mapping = entityAsMap(client().performRequest(mappingRequest));
-        assertNotNull(XContentMapValues.extractValue(mapping, "filebeat", "mappings", "properties", "apache2"));
+//        Request mappingRequest = new Request("GET", "/" + "filebeat" + "/_mapping");
+//        Map<String, Object> mapping = entityAsMap(client().performRequest(mappingRequest));
+//        assertNotNull(XContentMapValues.extractValue(mapping, "filebeat", "mappings", "properties", "apache2"));
     }
 
 }

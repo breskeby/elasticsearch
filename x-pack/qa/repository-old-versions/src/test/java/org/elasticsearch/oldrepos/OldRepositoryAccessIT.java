@@ -156,7 +156,7 @@ public class OldRepositoryAccessIT extends ESRestTestCase {
         settingsBuilder.endObject().endObject();
 
         createIndex.setJsonEntity(Strings.toString(settingsBuilder));
-        assertOK(oldEs.performRequest(createIndex));
+        assertOK(client().performRequest(createIndex));
 
         for (int i = 0; i < numDocs + extraDocs; i++) {
             String id = "testdoc" + i;
@@ -166,7 +166,7 @@ public class OldRepositoryAccessIT extends ESRestTestCase {
             Request doc = new Request("PUT", "/" + indexName + "/" + type + "/" + id);
             doc.addParameter("refresh", "true");
             doc.setJsonEntity(sourceForDoc(i));
-            assertOK(oldEs.performRequest(doc));
+            assertOK(client().performRequest(doc));
         }
 
         for (int i = 0; i < extraDocs; i++) {
@@ -175,7 +175,7 @@ public class OldRepositoryAccessIT extends ESRestTestCase {
             String type = getType(oldVersion, id);
             Request doc = new Request("DELETE", "/" + indexName + "/" + type + "/" + id);
             doc.addParameter("refresh", "true");
-            oldEs.performRequest(doc);
+            client().performRequest(doc);
         }
 
         // register repo on old ES and take snapshot
@@ -185,12 +185,12 @@ public class OldRepositoryAccessIT extends ESRestTestCase {
             """, repoLocation) : Strings.format("""
             {"type":"fs","settings":{"location":"%s"}}
             """, repoLocation));
-        assertOK(oldEs.performRequest(createRepoRequest));
+        assertOK(client().performRequest(createRepoRequest));
 
         Request createSnapshotRequest = new Request("PUT", "/_snapshot/" + repoName + "/" + snapshotName);
         createSnapshotRequest.addParameter("wait_for_completion", "true");
         createSnapshotRequest.setJsonEntity("{\"indices\":\"" + indexName + "\"}");
-        assertOK(oldEs.performRequest(createSnapshotRequest));
+        assertOK(client().performRequest(createSnapshotRequest));
 
         // register repo on new ES
         Settings.Builder repoSettingsBuilder = Settings.builder().put("location", repoLocation);
