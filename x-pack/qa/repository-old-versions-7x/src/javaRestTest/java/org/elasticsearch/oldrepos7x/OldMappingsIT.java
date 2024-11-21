@@ -36,12 +36,22 @@ import java.util.stream.Collectors;
 public class OldMappingsIT extends ESRestTestCase {
 
     @ClassRule
-    public static ElasticsearchCluster currentCluster = ElasticsearchCluster.local().distribution(DistributionType.DEFAULT).build();
+    public static ElasticsearchCluster currentCluster = ElasticsearchCluster.local().distribution(DistributionType.DEFAULT)
+                .distribution(DistributionType.DEFAULT)
+        .setting("xpack.security.enabled", "false")
+        .setting("xpack.ml.enabled", "false").build();
 
     @ClassRule
     public static ElasticsearchCluster oldCluster = ElasticsearchCluster.local()
         .version(Version.fromString("7.17.25"))
         .distribution(DistributionType.DEFAULT)
+        .setting("xpack.security.enabled", "false")
+        .setting("xpack.ml.enabled", "false")
+//        .apply(builder -> {
+//            if (System.getenv("JAVA_HOME") != null) {
+//                builder.environment("JAVA_HOME", System.getenv("JAVA_HOME"));
+//            }
+//        })
         .build();
 
     @Override
