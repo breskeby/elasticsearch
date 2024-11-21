@@ -1,8 +1,9 @@
 import org.elasticsearch.gradle.internal.test.RestIntegTestTask
+import org.elasticsearch.gradle.Version
 
 apply plugin: 'elasticsearch.internal-java-rest-test'
 
 tasks.named("javaRestTest").configure {
   usesDefaultDistribution()
-  usesBwcDefaultDistribution()
+  usesBwcDistribution(Version.fromString("7.17.25"))
 }
