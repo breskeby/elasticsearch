@@ -7,6 +7,15 @@
  * License v3.0 only", or the "Server Side Public License, v 1".
  */
 
+import org.elasticsearch.gradle.Architecture
+import org.elasticsearch.gradle.OS
+import org.elasticsearch.gradle.Version
+import org.elasticsearch.gradle.internal.BwcVersions
+import org.elasticsearch.gradle.internal.test.AntFixture
+import org.elasticsearch.gradle.testclusters.StandaloneRestIntegTestTask
+import org.elasticsearch.gradle.transform.UnzipTransform
+import static org.elasticsearch.gradle.PropertyNormalization.IGNORE_VALUE
+
 description = """\
 Launches versions of Elasticsearch prior to 5.0 for testing.
 These need special handling because they do not support writing
@@ -14,9 +23,57 @@ a "ports" file with the port on which Elasticsearch is running.
 """
 
 apply plugin: 'elasticsearch.java'
-tasks.named("test").configure { enabled = false }
+apply plugin: 'elasticsearch.cache-test-fixtures'
+apply plugin: 'elasticsearch.deploy-test-fixtures'
+
+project.getDependencies().registerTransform(UnzipTransform.class, transformSpec -> {
+  transformSpec.getFrom().attribute(ArtifactTypeDefinition.ARTIFACT_TYPE_ATTRIBUTE, ArtifactTypeDefinition.ZIP_TYPE);
+  transformSpec.getTo().attribute(ArtifactTypeDefinition.ARTIFACT_TYPE_ATTRIBUTE, ArtifactTypeDefinition.DIRECTORY_TYPE);
+  transformSpec.getParameters().setTrimmedPrefixPattern("elasticsearch\\-\\d+\\.\\d+\\.\\d+");
+});
+
+for (String versionString : ['6.8.20']) {
+  Version esVersion = Version.fromString(versionString)
+  String packageName = 'org.elasticsearch.distribution.zip'
+  String artifact = "${packageName}:elasticsearch:${esVersion}@zip"
+  String versionNoDots = esVersion.toString().replace('.', '')
+  String configName = "es${versionNoDots}"
+
+  def config = configurations.create(configName)
+  config.getAttributes().attribute(ArtifactTypeDefinition.ARTIFACT_TYPE_ATTRIBUTE, ArtifactTypeDefinition.DIRECTORY_TYPE);
+  dependencies.add(configName, artifact)
+
+  def contextTask = tasks.register("create" + configName.capitalize() + "Context", Copy) {
+    into("build/contexts/es6820")
+    from(config) {
+      into("elasticsearch")
+    }
+    from "Dockerfile"
+  }
+
+  dockerFixtures.register(configName) {
+      dockerContext = contextTask.map {it.getDestinationDir()}
+      version = "1.0"
+      baseImages = ["alpine:3.21.0"]
+  }
+}
 
 dependencies {
   // Just for the constants....
   api "org.apache.lucene:lucene-core:${versions.lucene}"
+
+  api project(':test:fixtures:testcontainer-utils')
+  api("org.testcontainers:testcontainers:${versions.testcontainer}") {
+    transitive = false
+  }
+  implementation("com.carrotsearch.randomizedtesting:randomizedtesting-runner:${versions.randomizedrunner}"){
+    transitive = false
+  }
+  implementation "org.slf4j:slf4j-api:${versions.slf4j}"
+  // implementation "com.github.docker-java:docker-java-api:${versions.dockerJava}"
+  implementation "com.fasterxml.jackson.core:jackson-annotations:${versions.jackson}"
+
+  // ensure we have proper logging during when used in tests
+  runtimeOnly "org.slf4j:slf4j-simple:${versions.slf4j}"
+  runtimeOnly "org.hamcrest:hamcrest:${versions.hamcrest}"
 }

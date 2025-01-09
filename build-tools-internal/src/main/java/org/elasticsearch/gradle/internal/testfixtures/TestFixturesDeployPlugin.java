@@ -46,6 +46,7 @@ public class TestFixturesDeployPlugin implements Plugin<Project> {
             fixture -> project.getTasks()
                 .register("deploy" + StringUtils.capitalize(fixture.getName()) + "DockerImage", DockerBuildTask.class, task -> {
                     task.getDockerContext().fileValue(fixture.getDockerContext().get());
+                    task.getInputs().dir(fixture.getDockerContext());
                     List<String> baseImages = fixture.getBaseImages().get();
                     if (baseImages.isEmpty() == false) {
                         task.setBaseImages(baseImages.toArray(new String[baseImages.size()]));
@@ -53,7 +54,10 @@ public class TestFixturesDeployPlugin implements Plugin<Project> {
                     task.setNoCache(isCi);
                     task.setTags(
                         new String[] {
-                            resolveTargetDockerRegistry(fixture) + "/" + fixture.getName() + "-fixture:" + fixture.getVersion().get() }
+                            fixture.getName() + "-fixture:" + fixture.getVersion().get() }
+
+//                    new String[] {
+//                            resolveTargetDockerRegistry(fixture) + "/" + fixture.getName() + "-fixture:" + fixture.getVersion().get() }
                     );
                     task.getPush().set(isCi);
                     task.getPlatforms().addAll(Arrays.stream(Architecture.values()).map(a -> a.dockerPlatform).toList());

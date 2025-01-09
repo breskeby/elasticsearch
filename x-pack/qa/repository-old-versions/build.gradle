@@ -21,13 +21,13 @@ apply plugin: 'elasticsearch.internal-java-rest-test'
 
 apply plugin: 'elasticsearch.rest-resources'
 
-
 configurations {
   oldesFixture
 }
 
 dependencies {
   oldesFixture project(':test:fixtures:old-elasticsearch')
+  javaRestTestImplementation project(':test:fixtures:old-elasticsearch')
 }
 
 jdks {
@@ -85,7 +85,7 @@ if (OS.current() == OS.WINDOWS) {
     config.getAttributes().attribute(ArtifactTypeDefinition.ARTIFACT_TYPE_ATTRIBUTE, ArtifactTypeDefinition.DIRECTORY_TYPE);
     dependencies.add(configName, artifact)
 
-    String repoLocation = "${buildDir}/cluster/shared/repo/${versionNoDots}"
+    String repoLocation = "${layout.buildDirectory.asFile.get()}/cluster/shared/repo/${versionNoDots}"
     String clusterName = versionNoDots
 
     def testClusterProvider = testClusters.register(clusterName) {

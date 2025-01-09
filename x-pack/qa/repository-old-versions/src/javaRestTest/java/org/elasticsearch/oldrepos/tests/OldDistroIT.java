@@ -14,6 +14,7 @@ import org.elasticsearch.test.cluster.local.LocalClusterConfigProvider;
 import org.elasticsearch.test.cluster.local.LocalClusterSpecBuilder;
 import org.elasticsearch.test.cluster.local.distribution.DistributionType;
 import org.elasticsearch.test.cluster.util.Version;
+import org.elasticsearch.test.fixtures.elasticsearch.OldElasticsearchTestContainer;
 import org.elasticsearch.test.rest.ESRestTestCase;
 import org.junit.ClassRule;
 
@@ -22,24 +23,27 @@ import java.io.IOException;
 import static org.hamcrest.Matchers.is;
 
 public class OldDistroIT extends ESRestTestCase {
+//
+//    @ClassRule
+//    public static ElasticsearchCluster cluster = ElasticsearchCluster.local()
+//        // .version(Version.fromString("7.17.20"))
+//        .version(Version.fromString("6.0.0"))
+//        .distribution(DistributionType.DEFAULT)
+//        .setting("xpack.security.enabled", "false")
+//        .setting("xpack.ml.enabled", "false")
+//        .apply(builder -> {
+//            if (System.getenv("JAVA_HOME") != null) {
+//                builder.environment("JAVA_HOME", System.getenv("JAVA_HOME"));
+//            }
+//        })
+//        .build();
 
     @ClassRule
-    public static ElasticsearchCluster cluster = ElasticsearchCluster.local()
-        // .version(Version.fromString("7.17.20"))
-        .version(Version.fromString("6.0.0"))
-        .distribution(DistributionType.DEFAULT)
-        .setting("xpack.security.enabled", "false")
-        .setting("xpack.ml.enabled", "false")
-        .apply(builder -> {
-            if (System.getenv("JAVA_HOME") != null) {
-                builder.environment("JAVA_HOME", System.getenv("JAVA_HOME"));
-            }
-        })
-        .build();
+    public static OldElasticsearchTestContainer oldElasticsearch = new OldElasticsearchTestContainer();
 
     @Override
     protected String getTestRestCluster() {
-        return cluster.getHttpAddresses();
+        return "127.0.0.1:" + oldElasticsearch.getPort();
     }
 
     public void testCreateIndex() throws IOException {
