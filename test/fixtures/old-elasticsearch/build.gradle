@@ -45,8 +45,13 @@ for (String versionString : ['6.8.20']) {
 
   def contextTask = tasks.register("create" + configName.capitalize() + "Context", Copy) {
     into("build/contexts/es6820")
-    from(config) {
-      into("elasticsearch")
+    into("elasticsearch") {
+      from(config) {
+        exclude "config/elasticsearch.yml"
+      }
+      from('src/main/resources/elasticsearch.yml') {
+        into("config")
+      }
     }
     from "Dockerfile"
   }

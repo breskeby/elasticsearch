@@ -9,27 +9,92 @@
 
 package org.elasticsearch.test.fixtures.elasticsearch;
 
+import org.apache.lucene.util.IOUtils;
 import org.elasticsearch.test.fixtures.testcontainers.DockerEnvironmentAwareTestContainer;
+import org.junit.rules.TemporaryFolder;
+import org.testcontainers.containers.BindMode;
 import org.testcontainers.containers.Network;
-import org.testcontainers.containers.wait.strategy.Wait;
-import org.testcontainers.containers.wait.strategy.WaitAllStrategy;
 import org.testcontainers.images.RemoteDockerImage;
+import org.testcontainers.shaded.org.apache.commons.io.FileUtils;
+import org.testcontainers.utility.MountableFile;
 
-import java.time.Duration;
+import java.io.File;
+import java.io.FileWriter;
+import java.io.IOException;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.concurrent.Callable;
 
 public final class OldElasticsearchTestContainer extends DockerEnvironmentAwareTestContainer {
     public static final String DOCKER_IMAGE = "es6820-fixture:1.0";
-    public static final int PORT = 9300;
+    public static final int PORT = 9200;
+    private final TemporaryFolder tempFolder = new TemporaryFolder();
+
+    private Callable<File> repoPath;
+
+    private Map<String,String> settings =  new HashMap<>();
 
     public OldElasticsearchTestContainer() {
         super(new RemoteDockerImage(DOCKER_IMAGE));
         withNetwork(Network.newNetwork());
-        addExposedPorts(9300);
-        setWaitStrategy(
-            new WaitAllStrategy().withStartupTimeout(Duration.ofSeconds(120))
-                .withStrategy(Wait.forLogMessage(".*mode [basic] - valid.*", 1))
-                .withStrategy(Wait.forListeningPort())
-        );
+        addExposedPorts(PORT);
+    }
+
+    public OldElasticsearchTestContainer withSetting(String key, String value) {
+        this.settings.put(key, value);
+        return this;
+    }
+
+    public OldElasticsearchTestContainer withRepoPath(Callable<File> repoPath) {
+        this.repoPath = repoPath;
+        return this;
+    }
+
+    public String getRepositoryPath() {
+        return "/usr/share/elasticsearch/repo";
+    }
+
+    @Override
+    public void start() {
+        try {
+            tempFolder.create();
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+        settings.put("network.host", "0.0.0.0");
+        settings.put("xpack.license.self_generated.type", "trial");
+        settings.put("xpack.ml.enabled", "false");
+
+        if(repoPath != null) {
+            File repoPathCalled = null;
+            try {
+                repoPathCalled = repoPath.call();
+            } catch (Exception e) {
+                throw new RuntimeException(e);
+            }
+            withFileSystemBind(repoPathCalled.getAbsolutePath(), getRepositoryPath(), BindMode.READ_WRITE);
+            settings.put("path.repo", getRepositoryPath());
+        }
+
+        try {
+            File file = tempFolder.newFile("elasticsearch.yml");
+            try (FileWriter writer = new FileWriter(file)) {
+                settings.forEach((key, value) -> {
+                    try {
+                        writer.write(key + ": " + value + "\n");
+                    } catch (IOException e) {
+                        throw new RuntimeException(e);
+                    }
+                });
+            }
+
+            String content = FileUtils.readFileToString(file);
+            System.out.println("content = \n" + content);
+            withCopyFileToContainer(MountableFile.forHostPath(file.toPath()), "/opt/elasticsearch/config/elasticsearch.yml");
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+        super.start();
     }
 
     public int getPort() {
