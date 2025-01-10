@@ -112,9 +112,8 @@ public class OldRepositoryAccessIT extends ESRestTestCase {
                         try {
                             base.evaluate();
                             closeClients();
-                            cluster.restart(true);
-//                            cluster.upgradeNodeToVersion(0, org.elasticsearch.test.cluster.util.Version.CURRENT);
-//                            cluster.upgradeNodeToVersion(1, org.elasticsearch.test.cluster.util.Version.CURRENT);
+                            cluster.restart(false);
+
                             afterRestart = true;
                             base.evaluate();
                         } catch (Throwable t) {

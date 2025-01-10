@@ -11,6 +11,8 @@ import com.carrotsearch.randomizedtesting.RandomizedTest;
 import com.carrotsearch.randomizedtesting.annotations.Name;
 import com.carrotsearch.randomizedtesting.annotations.ParametersFactory;
 
+import com.carrotsearch.randomizedtesting.annotations.ThreadLeakFilters;
+
 import org.apache.http.HttpHost;
 import org.elasticsearch.Version;
 import org.elasticsearch.client.Request;
@@ -21,11 +23,19 @@ import org.elasticsearch.common.settings.Settings;
 import org.elasticsearch.common.util.concurrent.ThreadContext;
 import org.elasticsearch.core.Booleans;
 import org.elasticsearch.core.PathUtils;
+import org.elasticsearch.test.cluster.ElasticsearchCluster;
+import org.elasticsearch.test.cluster.local.distribution.DistributionType;
+import org.elasticsearch.test.fixtures.elasticsearch.OldElasticsearchTestContainer;
+import org.elasticsearch.test.fixtures.testcontainers.TestContainersThreadFilter;
 import org.elasticsearch.test.rest.yaml.ClientYamlTestCandidate;
 import org.elasticsearch.test.rest.yaml.ESClientYamlSuiteTestCase;
 import org.elasticsearch.xcontent.XContentBuilder;
 import org.elasticsearch.xcontent.XContentFactory;
 import org.junit.Before;
+import org.junit.ClassRule;
+import org.junit.rules.RuleChain;
+import org.junit.rules.TemporaryFolder;
+import org.junit.rules.TestRule;
 
 import java.io.IOException;
 
@@ -39,10 +49,33 @@ import java.io.IOException;
  * We mimic the setup in search/390_doc_values_search.yml here, but adapt it to work
  * against older version clusters.
  */
+@ThreadLeakFilters(filters = { TestContainersThreadFilter.class })
 public class DocValueOnlyFieldsIT extends ESClientYamlSuiteTestCase {
 
-    final Version oldVersion = Version.fromString(System.getProperty("tests.es.version"));
+    static final Version oldVersion = Version.fromString("6.8.20");
     static boolean setupDone;
+
+    private static TemporaryFolder repoDirectory = new TemporaryFolder();
+
+
+    public static OldElasticsearchTestContainer oldElasticsearch = new OldElasticsearchTestContainer().withRepoPath(
+        () -> repoDirectory.getRoot()
+    );
+
+    public static ElasticsearchCluster cluster = ElasticsearchCluster.local()
+        .distribution(DistributionType.DEFAULT)
+        .nodes(2)
+        .setting("path.repo", () -> repoDirectory.getRoot().getAbsolutePath())
+        .setting("xpack.license.self_generated.type", "trial")
+        .setting("xpack.security.enabled", "false")
+        .setting("xpack.ml.enabled", "false")
+        .user("admin", "admin-password", "superuser", true)
+        .setting("xpack.searchable.snapshot.shared_cache.size", "16MB")
+        .setting("xpack.searchable.snapshot.shared_cache.region_size", "256KB")
+        .build();
+
+    @ClassRule
+    public static TestRule ruleChain = RuleChain.outerRule(repoDirectory).around(cluster).around(oldElasticsearch);
 
     public DocValueOnlyFieldsIT(@Name("yaml") ClientYamlTestCandidate testCandidate) {
         super(testCandidate);
@@ -50,7 +83,7 @@ public class DocValueOnlyFieldsIT extends ESClientYamlSuiteTestCase {
 
     @ParametersFactory
     public static Iterable<Object[]> parameters() throws Exception {
-        return ESClientYamlSuiteTestCase.createParameters();
+        return createParameters();
     }
 
     @Override
@@ -65,6 +98,11 @@ public class DocValueOnlyFieldsIT extends ESClientYamlSuiteTestCase {
     }
 
     @Override
+    protected String getTestRestCluster() {
+        return cluster.getHttpAddresses();
+    }
+
+    @Override
     protected boolean skipSetupSections() {
         // setup in the YAML file is replaced by the method below
         return true;
@@ -72,7 +110,7 @@ public class DocValueOnlyFieldsIT extends ESClientYamlSuiteTestCase {
 
     @Before
     public void setupIndex() throws IOException {
-        final boolean afterRestart = Booleans.parseBoolean(System.getProperty("tests.after_restart"));
+        final boolean afterRestart = false;//Booleans.parseBoolean(System.getProperty("tests.after_restart"));
         if (afterRestart) {
             return;
         }
@@ -85,9 +123,7 @@ public class DocValueOnlyFieldsIT extends ESClientYamlSuiteTestCase {
 
         setupDone = true;
 
-        String repoLocation = PathUtils.get(System.getProperty("tests.repo.location"))
-            .resolve(RandomizedTest.getContext().getTargetClass().getName())
-            .toString();
+        String repoLocationPostfix = RandomizedTest.getContext().getTargetClass().getName();
 
         String indexName = "test";
         String repoName = "doc_values_repo";
@@ -105,7 +141,7 @@ public class DocValueOnlyFieldsIT extends ESClientYamlSuiteTestCase {
             "ip",
             "geo_point" }; // date is manually added as it need further configuration
 
-        int oldEsPort = Integer.parseInt(System.getProperty("tests.es.port"));
+        int oldEsPort = oldElasticsearch.getPort();
         try (RestClient oldEs = RestClient.builder(new HttpHost("127.0.0.1", oldEsPort)).build()) {
             Request createIndex = new Request("PUT", "/" + indexName);
             int numberOfShards = randomIntBetween(1, 3);
@@ -178,7 +214,7 @@ public class DocValueOnlyFieldsIT extends ESClientYamlSuiteTestCase {
             Request createRepoRequest = new Request("PUT", "/_snapshot/" + repoName);
             createRepoRequest.setJsonEntity(Strings.format("""
                 {"type":"fs","settings":{"location":"%s"}}
-                """, repoLocation));
+                """, oldElasticsearch.getRepositoryPath() + "/" + repoLocationPostfix));
             assertOK(oldEs.performRequest(createRepoRequest));
 
             Request createSnapshotRequest = new Request("PUT", "/_snapshot/" + repoName + "/" + snapshotName);
@@ -191,7 +227,7 @@ public class DocValueOnlyFieldsIT extends ESClientYamlSuiteTestCase {
         Request createRepoRequest2 = new Request("PUT", "/_snapshot/" + repoName);
         createRepoRequest2.setJsonEntity(Strings.format("""
             {"type":"fs","settings":{"location":"%s"}}
-            """, repoLocation));
+            """, repoDirectory.getRoot().getAbsolutePath() + "/" + repoLocationPostfix));
         assertOK(client().performRequest(createRepoRequest2));
 
         final Request createRestoreRequest = new Request("POST", "/_snapshot/" + repoName + "/" + snapshotName + "/_restore");

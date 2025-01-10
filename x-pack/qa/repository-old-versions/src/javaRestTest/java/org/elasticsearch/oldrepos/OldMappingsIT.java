@@ -58,42 +58,8 @@ public class OldMappingsIT extends ESRestTestCase {
 
     static final Version oldVersion = Version.fromString("6.8.20");
     static boolean setupDone;
+
     private static TemporaryFolder repoDirectory = new TemporaryFolder();
-
-    @ClassRule
-    public static ExternalResource resource = new ExternalResource() {
-        @Override
-        public Statement apply(Statement base, Description description) {
-            try {
-                return new Statement() {
-                    @Override
-                    public void evaluate() throws Throwable {
-                        before();
-                        List<Throwable> errors = new ArrayList<Throwable>();
-                        try {
-                            base.evaluate();
-                            closeClients();
-                            cluster.restart(false);
-                            restarted = true;
-                            base.evaluate();
-                        } catch (Throwable t) {
-                            errors.add(t);
-                        } finally {
-                            try {
-                                after();
-                            } catch (Throwable t) {
-                                errors.add(t);
-                            }
-                        }
-                        MultipleFailureException.assertEmpty(errors);
-                    }
-                };
-            } catch (Throwable e) {
-                throw new RuntimeException(e);
-            }
-        }
-    };
-
     public static OldElasticsearchTestContainer oldElasticsearch = new OldElasticsearchTestContainer().withRepoPath(
         () -> repoDirectory.getRoot()
     );
