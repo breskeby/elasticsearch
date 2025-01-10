@@ -38,6 +38,7 @@ public final class OldElasticsearchTestContainer extends DockerEnvironmentAwareT
         super(new RemoteDockerImage(DOCKER_IMAGE));
         withNetwork(Network.newNetwork());
         addExposedPorts(PORT);
+        canBeReused();
     }
 
     public OldElasticsearchTestContainer withSetting(String key, String value) {

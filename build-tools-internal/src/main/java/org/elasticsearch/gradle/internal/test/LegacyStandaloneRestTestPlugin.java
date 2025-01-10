@@ -14,7 +14,6 @@ import org.elasticsearch.gradle.internal.info.GlobalBuildInfoPlugin;
 import org.elasticsearch.gradle.internal.precommit.InternalPrecommitTasks;
 import org.elasticsearch.gradle.internal.test.rest.LegacyJavaRestTestPlugin;
 import org.elasticsearch.gradle.internal.test.rest.LegacyYamlRestTestPlugin;
-import org.elasticsearch.gradle.internal.test.rest.RestTestBasePlugin;
 import org.elasticsearch.gradle.internal.test.rest.RestTestUtil;
 import org.gradle.api.InvalidUserDataException;
 import org.gradle.api.Plugin;
@@ -34,8 +33,11 @@ import java.util.Map;
  * and run REST tests. Use BuildPlugin if you want to build main code as well
  * as tests.
  *
+ * @deprecated use {@link InternalClusterTestPlugin}, {@link LegacyJavaRestTestPlugin} or
+ * {@link LegacyYamlRestTestPlugin} instead.
  */
-public class StandaloneRestTestPlugin implements Plugin<Project> {
+@Deprecated
+public class LegacyStandaloneRestTestPlugin implements Plugin<Project> {
     @Override
     public void apply(final Project project) {
         if (project.getPluginManager().hasPlugin("elasticsearch.build")) {
@@ -44,7 +46,9 @@ public class StandaloneRestTestPlugin implements Plugin<Project> {
             );
         }
 
-        project.getPluginManager().apply(RestTestBasePlugin.class);
+        project.getRootProject().getPluginManager().apply(GlobalBuildInfoPlugin.class);
+        project.getPluginManager().apply(LegacyRestTestBasePlugin.class);
+
         project.getTasks().register("buildResources", ExportElasticsearchBuildResourcesTask.class);
 
         // only setup tests to build

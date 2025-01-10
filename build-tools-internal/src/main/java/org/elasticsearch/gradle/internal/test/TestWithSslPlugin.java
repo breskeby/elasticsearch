@@ -54,7 +54,7 @@ public class TestWithSslPlugin implements Plugin<Project> {
             .configureEach(
                 filePermissionPlugin -> project.getTasks().named(FILEPERMISSIONS_TASK_NAME).configure(t -> t.dependsOn(exportKeyStore))
             );
-        project.getPlugins().withType(StandaloneRestTestPlugin.class).configureEach(restTestPlugin -> {
+        project.getPlugins().withType(LegacyStandaloneRestTestPlugin.class).configureEach(restTestPlugin -> {
             SourceSet testSourceSet = Util.getJavaTestSourceSet(project).get();
             testSourceSet.getResources().srcDir(new File(keyStoreDir, "test/ssl"));
             project.getTasks().named(testSourceSet.getProcessResourcesTaskName()).configure(t -> t.dependsOn(exportKeyStore));
