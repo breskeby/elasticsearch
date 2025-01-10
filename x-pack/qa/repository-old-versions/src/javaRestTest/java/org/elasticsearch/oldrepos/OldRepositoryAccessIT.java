@@ -7,6 +7,8 @@
 
 package org.elasticsearch.oldrepos;
 
+import com.carrotsearch.randomizedtesting.annotations.ThreadLeakFilters;
+
 import org.apache.http.HttpHost;
 import org.elasticsearch.Version;
 import org.elasticsearch.action.admin.cluster.repositories.put.PutRepositoryRequest;
@@ -23,9 +25,7 @@ import org.elasticsearch.common.document.DocumentField;
 import org.elasticsearch.common.settings.SecureString;
 import org.elasticsearch.common.settings.Settings;
 import org.elasticsearch.common.util.concurrent.ThreadContext;
-import org.elasticsearch.core.Booleans;
 import org.elasticsearch.core.Nullable;
-import org.elasticsearch.core.PathUtils;
 import org.elasticsearch.index.IndexVersion;
 import org.elasticsearch.index.query.QueryBuilders;
 import org.elasticsearch.search.SearchHit;
@@ -34,13 +34,24 @@ import org.elasticsearch.search.builder.SearchSourceBuilder;
 import org.elasticsearch.search.sort.SortBuilders;
 import org.elasticsearch.search.sort.SortOrder;
 import org.elasticsearch.snapshots.SnapshotState;
+import org.elasticsearch.test.cluster.ElasticsearchCluster;
+import org.elasticsearch.test.cluster.local.distribution.DistributionType;
+import org.elasticsearch.test.fixtures.elasticsearch.OldElasticsearchTestContainer;
+import org.elasticsearch.test.fixtures.testcontainers.TestContainersThreadFilter;
 import org.elasticsearch.test.hamcrest.ElasticsearchAssertions;
 import org.elasticsearch.test.rest.ESRestTestCase;
 import org.elasticsearch.test.rest.ObjectPath;
 import org.elasticsearch.xcontent.XContentBuilder;
 import org.elasticsearch.xcontent.XContentFactory;
+import org.hamcrest.Matchers;
+import org.junit.Assume;
+import org.junit.ClassRule;
+import org.junit.rules.RuleChain;
+import org.junit.rules.TemporaryFolder;
+import org.junit.rules.TestRule;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
 import java.util.HashSet;
@@ -49,22 +60,84 @@ import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 
-import static org.hamcrest.Matchers.contains;
-import static org.hamcrest.Matchers.containsString;
-import static org.hamcrest.Matchers.empty;
-import static org.hamcrest.Matchers.equalTo;
-import static org.hamcrest.Matchers.greaterThan;
-import static org.hamcrest.Matchers.hasKey;
-import static org.hamcrest.Matchers.instanceOf;
-import static org.hamcrest.Matchers.lessThan;
-import static org.hamcrest.Matchers.not;
-import static org.hamcrest.Matchers.startsWith;
+import org.junit.rules.ExternalResource;
+import org.junit.runner.Description;
+import org.junit.runners.model.Statement;
+import org.junit.runners.model.MultipleFailureException;
 
+@ThreadLeakFilters(filters = { TestContainersThreadFilter.class })
 public class OldRepositoryAccessIT extends ESRestTestCase {
 
     @Override
     protected boolean preserveClusterUponCompletion() {
         return true;
+    }
+
+    static final Version oldVersion = Version.fromString("6.8.20");
+
+    private static TemporaryFolder repoDirectory = new TemporaryFolder();
+    private static boolean afterRestart = false;
+
+    public static OldElasticsearchTestContainer oldElasticsearch = new OldElasticsearchTestContainer()
+        .withRepoPath(() -> repoDirectory.getRoot()
+    );
+
+    public static ElasticsearchCluster cluster = ElasticsearchCluster.local()
+        .distribution(DistributionType.DEFAULT)
+        .nodes(2)
+        .setting("path.repo", () -> repoDirectory.getRoot().getAbsolutePath())
+        .setting("xpack.license.self_generated.type", "trial")
+        .setting("xpack.security.enabled", "false")
+        .setting("xpack.ml.enabled", "false")
+        .user("admin", "admin-password", "superuser", true)
+        .setting("xpack.searchable.snapshot.shared_cache.size", "16MB")
+        .setting("xpack.searchable.snapshot.shared_cache.region_size", "256KB")
+        .build();
+
+
+    @ClassRule
+    public static TestRule ruleChain = RuleChain.outerRule(repoDirectory).around(cluster).around(oldElasticsearch);
+
+
+    @ClassRule
+    public static ExternalResource resource = new ExternalResource() {
+        @Override
+        public Statement apply(Statement base, Description description) {
+            try {
+                return new Statement() {
+                    @Override
+                    public void evaluate() throws Throwable {
+                        before();
+                        List<Throwable> errors = new ArrayList<Throwable>();
+                        try {
+                            base.evaluate();
+                            closeClients();
+                            cluster.restart(true);
+//                            cluster.upgradeNodeToVersion(0, org.elasticsearch.test.cluster.util.Version.CURRENT);
+//                            cluster.upgradeNodeToVersion(1, org.elasticsearch.test.cluster.util.Version.CURRENT);
+                            afterRestart = true;
+                            base.evaluate();
+                        } catch (Throwable t) {
+                            errors.add(t);
+                        } finally {
+                            try {
+                                after();
+                            } catch (Throwable t) {
+                                errors.add(t);
+                            }
+                        }
+                        MultipleFailureException.assertEmpty(errors);
+                    }
+                };
+            } catch (Throwable e) {
+                throw new RuntimeException(e);
+            }
+        }
+    };
+
+    @Override
+    protected String getTestRestCluster() {
+        return cluster.getHttpAddresses();
     }
 
     @Override
@@ -73,28 +146,36 @@ public class OldRepositoryAccessIT extends ESRestTestCase {
         return Settings.builder().put(ThreadContext.PREFIX + ".Authorization", token).build();
     }
 
-    public void testOldRepoAccess() throws IOException {
-        runTest(false);
+    public void testOldRepoAccessBeforeRestart() throws IOException {
+        Assume.assumeFalse(afterRestart);
+        runTest(false, afterRestart);
     }
 
-    public void testOldSourceOnlyRepoAccess() throws IOException {
-        runTest(true);
+    public void testOldSourceOnlyRepoAccessBeforeRestart() throws IOException {
+        Assume.assumeFalse(afterRestart);
+        runTest(true, afterRestart);
     }
 
-    public void runTest(boolean sourceOnlyRepository) throws IOException {
-        boolean afterRestart = Booleans.parseBoolean(System.getProperty("tests.after_restart"));
-        String repoLocation = System.getProperty("tests.repo.location");
-        repoLocation = PathUtils.get(repoLocation).resolve("source_only_" + sourceOnlyRepository).toString();
-        Version oldVersion = Version.fromString(System.getProperty("tests.es.version"));
+    public void testOldRepoAccessAfterRestart() throws IOException {
+        Assume.assumeTrue(afterRestart);
+        runTest(false, afterRestart);
+    }
+
+    public void testOldSourceOnlyRepoAccessAfterRestart() throws IOException {
+        Assume.assumeTrue(afterRestart);
+        runTest(true, afterRestart);
+    }
+
+    public void runTest(boolean sourceOnlyRepository, boolean afterRestart) throws IOException {
+        String repoLocationSuffix = "/source_only_" + sourceOnlyRepository;
         assumeTrue(
             "source only repositories only supported since ES 6.5.0",
             sourceOnlyRepository == false || oldVersion.onOrAfter(Version.fromString("6.5.0"))
         );
-
-        assertThat("Index version should be added to archive tests", oldVersion, lessThan(Version.V_8_10_0));
+        assertThat("Index version should be added to archive tests", oldVersion, Matchers.lessThan(Version.V_8_10_0));
         IndexVersion indexVersion = IndexVersion.fromId(oldVersion.id);
 
-        int oldEsPort = Integer.parseInt(System.getProperty("tests.es.port"));
+        int oldEsPort = oldElasticsearch.getPort();
         String indexName;
         if (sourceOnlyRepository) {
             indexName = "source_only_test_index";
@@ -108,7 +189,7 @@ public class OldRepositoryAccessIT extends ESRestTestCase {
             if (afterRestart == false) {
                 beforeRestart(
                     sourceOnlyRepository,
-                    repoLocation,
+                    repoLocationSuffix,
                     oldVersion,
                     indexVersion,
                     numDocs,
@@ -131,7 +212,7 @@ public class OldRepositoryAccessIT extends ESRestTestCase {
 
     private void beforeRestart(
         boolean sourceOnlyRepository,
-        String repoLocation,
+        String repoLocationSuffix,
         Version oldVersion,
         IndexVersion indexVersion,
         int numDocs,
@@ -182,9 +263,9 @@ public class OldRepositoryAccessIT extends ESRestTestCase {
         Request createRepoRequest = new Request("PUT", "/_snapshot/" + repoName);
         createRepoRequest.setJsonEntity(sourceOnlyRepository ? Strings.format("""
             {"type":"source","settings":{"location":"%s","delegate_type":"fs"}}
-            """, repoLocation) : Strings.format("""
+            """, oldElasticsearch.getRepositoryPath() + repoLocationSuffix) : Strings.format("""
             {"type":"fs","settings":{"location":"%s"}}
-            """, repoLocation));
+            """, oldElasticsearch.getRepositoryPath() + repoLocationSuffix));
         assertOK(oldEs.performRequest(createRepoRequest));
 
         Request createSnapshotRequest = new Request("PUT", "/_snapshot/" + repoName + "/" + snapshotName);
@@ -193,7 +274,7 @@ public class OldRepositoryAccessIT extends ESRestTestCase {
         assertOK(oldEs.performRequest(createSnapshotRequest));
 
         // register repo on new ES
-        Settings.Builder repoSettingsBuilder = Settings.builder().put("location", repoLocation);
+        Settings.Builder repoSettingsBuilder = Settings.builder().put("location", repoDirectory.getRoot().getAbsolutePath() + repoLocationSuffix);
         if (sourceOnlyRepository) {
             repoSettingsBuilder.put("delegate_type", "fs");
         }
@@ -210,11 +291,11 @@ public class OldRepositoryAccessIT extends ESRestTestCase {
         Request getSnaps = new Request("GET", "/_snapshot/" + repoName + "/_all");
         Response getResponse = client().performRequest(getSnaps);
         ObjectPath getResp = ObjectPath.createFromResponse(getResponse);
-        assertThat(getResp.evaluate("total"), equalTo(1));
-        assertThat(getResp.evaluate("snapshots.0.snapshot"), equalTo(snapshotName));
-        assertThat(getResp.evaluate("snapshots.0.repository"), equalTo(repoName));
-        assertThat(getResp.evaluate("snapshots.0.indices"), contains(indexName));
-        assertThat(getResp.evaluate("snapshots.0.state"), equalTo(SnapshotState.SUCCESS.toString()));
+        assertThat(getResp.evaluate("total"), Matchers.equalTo(1));
+        assertThat(getResp.evaluate("snapshots.0.snapshot"), Matchers.equalTo(snapshotName));
+        assertThat(getResp.evaluate("snapshots.0.repository"), Matchers.equalTo(repoName));
+        assertThat(getResp.evaluate("snapshots.0.indices"), Matchers.contains(indexName));
+        assertThat(getResp.evaluate("snapshots.0.state"), Matchers.equalTo(SnapshotState.SUCCESS.toString()));
         assertEquals(numberOfShards, (int) getResp.evaluate("snapshots.0.shards.successful"));
         assertEquals(numberOfShards, (int) getResp.evaluate("snapshots.0.shards.total"));
         assertEquals(0, (int) getResp.evaluate("snapshots.0.shards.failed"));
@@ -224,11 +305,11 @@ public class OldRepositoryAccessIT extends ESRestTestCase {
         getSnaps = new Request("GET", "/_snapshot/" + repoName + "/" + snapshotName);
         getResponse = client().performRequest(getSnaps);
         getResp = ObjectPath.createFromResponse(getResponse);
-        assertThat(getResp.evaluate("total"), equalTo(1));
-        assertThat(getResp.evaluate("snapshots.0.snapshot"), equalTo(snapshotName));
-        assertThat(getResp.evaluate("snapshots.0.repository"), equalTo(repoName));
-        assertThat(getResp.evaluate("snapshots.0.indices"), contains(indexName));
-        assertThat(getResp.evaluate("snapshots.0.state"), equalTo(SnapshotState.SUCCESS.toString()));
+        assertThat(getResp.evaluate("total"), Matchers.equalTo(1));
+        assertThat(getResp.evaluate("snapshots.0.snapshot"), Matchers.equalTo(snapshotName));
+        assertThat(getResp.evaluate("snapshots.0.repository"), Matchers.equalTo(repoName));
+        assertThat(getResp.evaluate("snapshots.0.indices"), Matchers.contains(indexName));
+        assertThat(getResp.evaluate("snapshots.0.state"), Matchers.equalTo(SnapshotState.SUCCESS.toString()));
         assertEquals(numberOfShards, (int) getResp.evaluate("snapshots.0.shards.successful"));
         assertEquals(numberOfShards, (int) getResp.evaluate("snapshots.0.shards.total"));
         assertEquals(0, (int) getResp.evaluate("snapshots.0.shards.failed"));
@@ -238,16 +319,16 @@ public class OldRepositoryAccessIT extends ESRestTestCase {
         getSnaps = new Request("GET", "/_snapshot/" + repoName + "/" + snapshotName + "/_status");
         getResponse = client().performRequest(getSnaps);
         getResp = ObjectPath.createFromResponse(getResponse);
-        assertThat(((List<?>) getResp.evaluate("snapshots")).size(), equalTo(1));
-        assertThat(getResp.evaluate("snapshots.0.snapshot"), equalTo(snapshotName));
-        assertThat(getResp.evaluate("snapshots.0.repository"), equalTo(repoName));
-        assertThat(((Map<?, ?>) getResp.evaluate("snapshots.0.indices")).keySet(), contains(indexName));
-        assertThat(getResp.evaluate("snapshots.0.state"), equalTo(SnapshotState.SUCCESS.toString()));
+        assertThat(((List<?>) getResp.evaluate("snapshots")).size(), Matchers.equalTo(1));
+        assertThat(getResp.evaluate("snapshots.0.snapshot"), Matchers.equalTo(snapshotName));
+        assertThat(getResp.evaluate("snapshots.0.repository"), Matchers.equalTo(repoName));
+        assertThat(((Map<?, ?>) getResp.evaluate("snapshots.0.indices")).keySet(), Matchers.contains(indexName));
+        assertThat(getResp.evaluate("snapshots.0.state"), Matchers.equalTo(SnapshotState.SUCCESS.toString()));
         assertEquals(numberOfShards, (int) getResp.evaluate("snapshots.0.shards_stats.done"));
         assertEquals(numberOfShards, (int) getResp.evaluate("snapshots.0.shards_stats.total"));
         assertEquals(0, (int) getResp.evaluate("snapshots.0.shards_stats.failed"));
-        assertThat(getResp.evaluate("snapshots.0.stats.total.size_in_bytes"), greaterThan(0));
-        assertThat(getResp.evaluate("snapshots.0.stats.total.file_count"), greaterThan(0));
+        assertThat(getResp.evaluate("snapshots.0.stats.total.size_in_bytes"), Matchers.greaterThan(0));
+        assertThat(getResp.evaluate("snapshots.0.stats.total.file_count"), Matchers.greaterThan(0));
 
         // restore / mount and check whether searches work
         restoreMountAndVerify(numDocs, expectedIds, numberOfShards, sourceOnlyRepository, oldVersion, indexName, repoName, snapshotName);
@@ -298,30 +379,30 @@ public class OldRepositoryAccessIT extends ESRestTestCase {
         var response = responseAsMap(client().performRequest(new Request("GET", "/" + restoredIndex + "/_mapping")));
         Map<?, ?> mapping = ObjectPath.evaluate(response, restoredIndex + ".mappings");
         logger.info("mapping for {}: {}", restoredIndex, mapping);
-        assertThat(mapping, hasKey("_meta"));
-        assertThat(mapping.get("_meta"), instanceOf(Map.class));
+        assertThat(mapping, Matchers.hasKey("_meta"));
+        assertThat(mapping.get("_meta"), Matchers.instanceOf(Map.class));
         @SuppressWarnings("unchecked")
         Map<String, Object> meta = (Map<String, Object>) mapping.get("_meta");
-        assertThat(meta, hasKey("legacy_mappings"));
-        assertThat(meta.get("legacy_mappings"), instanceOf(Map.class));
+        assertThat(meta, Matchers.hasKey("legacy_mappings"));
+        assertThat(meta.get("legacy_mappings"), Matchers.instanceOf(Map.class));
         @SuppressWarnings("unchecked")
         Map<String, Object> legacyMappings = (Map<String, Object>) meta.get("legacy_mappings");
-        assertThat(legacyMappings.keySet(), not(empty()));
+        assertThat(legacyMappings.keySet(), Matchers.not(Matchers.empty()));
         for (Map.Entry<String, Object> entry : legacyMappings.entrySet()) {
             String type = entry.getKey();
-            assertThat(type, startsWith("doc"));
-            assertThat(entry.getValue(), instanceOf(Map.class));
+            assertThat(type, Matchers.startsWith("doc"));
+            assertThat(entry.getValue(), Matchers.instanceOf(Map.class));
             @SuppressWarnings("unchecked")
             Map<String, Object> legacyMapping = (Map<String, Object>) entry.getValue();
-            assertThat(legacyMapping, hasKey("properties"));
-            assertThat(legacyMapping.get("properties"), instanceOf(Map.class));
+            assertThat(legacyMapping, Matchers.hasKey("properties"));
+            assertThat(legacyMapping.get("properties"), Matchers.instanceOf(Map.class));
             @SuppressWarnings("unchecked")
             Map<String, Object> propertiesMapping = (Map<String, Object>) legacyMapping.get("properties");
-            assertThat(propertiesMapping, hasKey("val"));
-            assertThat(propertiesMapping.get("val"), instanceOf(Map.class));
+            assertThat(propertiesMapping, Matchers.hasKey("val"));
+            assertThat(propertiesMapping.get("val"), Matchers.instanceOf(Map.class));
             @SuppressWarnings("unchecked")
             Map<String, Object> valMapping = (Map<String, Object>) propertiesMapping.get("val");
-            assertThat(valMapping, hasKey("type"));
+            assertThat(valMapping, Matchers.hasKey("type"));
             assertEquals("long", valMapping.get("type"));
         }
 
@@ -460,7 +541,7 @@ public class OldRepositoryAccessIT extends ESRestTestCase {
                     for (SearchHit hit : searchResponse.getHits().getHits()) {
                         DocumentField typeField = hit.field("_type");
                         assertNotNull(typeField);
-                        assertThat(typeField.getValue(), instanceOf(String.class));
+                        assertThat(typeField.getValue(), Matchers.instanceOf(String.class));
                         assertEquals(randomType, typeField.getValue());
                     }
                 } finally {
@@ -471,7 +552,7 @@ public class OldRepositoryAccessIT extends ESRestTestCase {
             assertThat(
                 expectThrows(ResponseException.class, () -> client().performRequest(new Request("GET", "/" + index + "/_doc/" + id)))
                     .getMessage(),
-                containsString("get operations not allowed on a legacy index")
+                Matchers.containsString("get operations not allowed on a legacy index")
             );
 
             // check that shards are skipped based on non-matching date

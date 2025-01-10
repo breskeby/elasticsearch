@@ -183,12 +183,20 @@ if (OS.current() == OS.WINDOWS) {
 //    }
 //  }
 
+
   tasks.named("javaRestTest").configure {
     usesDefaultDistribution()
-//    dependsOn jdks.legacy
-//    usesBwcDistribution(Version.fromString("7.17.20"))
-//    usesBwcDistribution(Version.fromString("6.0.0"))
-//    environment 'JAVA_HOME', jdks.legacy.javaHomePath
+    maxParallelForks = 1
   }
+
+//
+//  tasks.register("javaRestTestAfterRestart", RestIntegTestTask).configure {
+//    dependsOn('javaRestTest')
+//    usesDefaultDistribution()
+////    dependsOn jdks.legacy
+////    usesBwcDistribution(Version.fromString("7.17.20"))
+////    usesBwcDistribution(Version.fromString("6.0.0"))
+////    environment 'JAVA_HOME', jdks.legacy.javaHomePath
+//  }
 }
 

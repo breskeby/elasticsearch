@@ -50,7 +50,6 @@ import org.gradle.api.tasks.PathSensitivity;
 import org.gradle.api.tasks.util.PatternFilterable;
 
 import java.util.Collection;
-import java.util.HashSet;
 import java.util.Iterator;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -215,7 +214,6 @@ public class RestTestBasePlugin implements Plugin<Project> {
                 }
             });
 
-            var processedVersions = new HashSet<Version>();
             // Add `usesBwcDistribution(version)` extension method to test tasks to indicate they require a BWC distribution
             task.getExtensions().getExtraProperties().set("usesBwcDistribution", new Closure<Void>(task) {
                 @Override
@@ -223,11 +221,8 @@ public class RestTestBasePlugin implements Plugin<Project> {
                     if (args.length != 1 || args[0] instanceof Version == false) {
                         throw new IllegalArgumentException("Expected exactly one argument of type org.elasticsearch.gradle.Version");
                     }
-                    if (processedVersions.contains(args[0])) {
-                        return null;
-                    }
+
                     Version version = (Version) args[0];
-                    processedVersions.add(version);
                     boolean isReleased = bwcVersions.unreleasedInfo(version) == null;
                     String versionString = version.toString();
                     ElasticsearchDistribution bwcDistro = createDistribution(project, "bwc_" + versionString, versionString);
@@ -268,10 +263,7 @@ public class RestTestBasePlugin implements Plugin<Project> {
         if (maybeDistro == null) {
             return distributions.create(name, distro -> {
                 distro.setVersion(version);
-                // distro.setArchitecture(Architecture.current());
-                // distro.setArchitecture(Architecture.current());
-                distro.setArchitecture(Architecture.X64);
-                // distro.setPlatform(ElasticsearchDistribution.Platform.LINUX);
+                distro.setArchitecture(Architecture.current());
                 if (type != null) {
                     distro.setType(type);
                 }

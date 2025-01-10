@@ -7,7 +7,6 @@
 
 package org.elasticsearch.oldrepos;
 
-import com.carrotsearch.randomizedtesting.annotations.TestCaseOrdering;
 import com.carrotsearch.randomizedtesting.annotations.ThreadLeakFilters;
 
 import org.apache.http.HttpHost;
@@ -23,7 +22,6 @@ import org.elasticsearch.common.settings.SecureString;
 import org.elasticsearch.common.settings.Settings;
 import org.elasticsearch.common.util.concurrent.ThreadContext;
 import org.elasticsearch.common.xcontent.support.XContentMapValues;
-import org.elasticsearch.test.AnnotationTestOrdering;
 import org.elasticsearch.test.cluster.ElasticsearchCluster;
 import org.elasticsearch.test.cluster.local.distribution.DistributionType;
 import org.elasticsearch.test.fixtures.elasticsearch.OldElasticsearchTestContainer;
@@ -34,11 +32,16 @@ import org.elasticsearch.xcontent.XContentFactory;
 import org.elasticsearch.xcontent.XContentType;
 import org.junit.Before;
 import org.junit.ClassRule;
+import org.junit.rules.ExternalResource;
 import org.junit.rules.RuleChain;
 import org.junit.rules.TemporaryFolder;
 import org.junit.rules.TestRule;
+import org.junit.runner.Description;
+import org.junit.runners.model.MultipleFailureException;
+import org.junit.runners.model.Statement;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
@@ -49,12 +52,47 @@ import static org.hamcrest.Matchers.hasKey;
 import static org.hamcrest.Matchers.hasSize;
 
 @ThreadLeakFilters(filters = { TestContainersThreadFilter.class })
-@TestCaseOrdering(AnnotationTestOrdering.class)
 public class OldMappingsIT extends ESRestTestCase {
+
+    static boolean restarted = false;
 
     static final Version oldVersion = Version.fromString("6.8.20");
     static boolean setupDone;
     private static TemporaryFolder repoDirectory = new TemporaryFolder();
+
+    @ClassRule
+    public static ExternalResource resource = new ExternalResource() {
+        @Override
+        public Statement apply(Statement base, Description description) {
+            try {
+                return new Statement() {
+                    @Override
+                    public void evaluate() throws Throwable {
+                        before();
+                        List<Throwable> errors = new ArrayList<Throwable>();
+                        try {
+                            base.evaluate();
+                            closeClients();
+                            cluster.restart(false);
+                            restarted = true;
+                            base.evaluate();
+                        } catch (Throwable t) {
+                            errors.add(t);
+                        } finally {
+                            try {
+                                after();
+                            } catch (Throwable t) {
+                                errors.add(t);
+                            }
+                        }
+                        MultipleFailureException.assertEmpty(errors);
+                    }
+                };
+            } catch (Throwable e) {
+                throw new RuntimeException(e);
+            }
+        }
+    };
 
     public static OldElasticsearchTestContainer oldElasticsearch = new OldElasticsearchTestContainer().withRepoPath(
         () -> repoDirectory.getRoot()
@@ -72,14 +110,15 @@ public class OldMappingsIT extends ESRestTestCase {
         .setting("xpack.searchable.snapshot.shared_cache.region_size", "256KB")
         .build();
 
-    @Override
-    protected String getTestRestCluster() {
-        return cluster.getHttpAddresses();
-    }
+
 
     @ClassRule
     public static TestRule ruleChain = RuleChain.outerRule(repoDirectory).around(cluster).around(oldElasticsearch);
 
+    @Override
+    protected String getTestRestCluster() {
+        return cluster.getHttpAddresses();
+    }
     @Override
     protected boolean preserveClusterUponCompletion() {
         return true;
@@ -217,12 +256,18 @@ public class OldMappingsIT extends ESRestTestCase {
         return createIndex;
     }
 
-    @AnnotationTestOrdering.Order(11)
     public void testMappingOk() throws IOException {
-        doTestMappingOk();
+        Request mappingRequest = new Request("GET", "/" + "filebeat" + "/_mapping");
+        Map<String, Object> mapping = entityAsMap(client().performRequest(mappingRequest));
+        assertNotNull(XContentMapValues.extractValue(mapping, "filebeat", "mappings", "properties", "apache2"));
+
+        if (oldVersion.before(Version.fromString("6.0.0"))) {
+            mappingRequest = new Request("GET", "/" + "winlogbeat" + "/_mapping");
+            mapping = entityAsMap(client().performRequest(mappingRequest));
+            assertNotNull(XContentMapValues.extractValue(mapping, "winlogbeat", "mappings", "properties", "message"));
+        }
     }
 
-    @AnnotationTestOrdering.Order(12)
     public void testSearchKeyword() throws IOException {
         Request search = new Request("POST", "/" + "custom" + "/_search");
         XContentBuilder query = XContentBuilder.builder(XContentType.JSON.xContent())
@@ -241,7 +286,6 @@ public class OldMappingsIT extends ESRestTestCase {
         assertThat(hits, hasSize(1));
     }
 
-    @AnnotationTestOrdering.Order(13)
     public void testSearchOnPlaceHolderField() throws IOException {
         Request search = new Request("POST", "/" + "custom" + "/_search");
         XContentBuilder query = XContentBuilder.builder(XContentType.JSON.xContent())
@@ -262,7 +306,6 @@ public class OldMappingsIT extends ESRestTestCase {
         );
     }
 
-    @AnnotationTestOrdering.Order(14)
     public void testAggregationOnPlaceholderField() throws IOException {
         Request search = new Request("POST", "/" + "custom" + "/_search");
         XContentBuilder query = XContentBuilder.builder(XContentType.JSON.xContent())
@@ -280,7 +323,6 @@ public class OldMappingsIT extends ESRestTestCase {
         assertThat(re.getMessage(), containsString("can't run aggregation or sorts on field type completion of legacy index"));
     }
 
-    @AnnotationTestOrdering.Order(15)
     public void testConstantScoringOnTextField() throws IOException {
         Request search = new Request("POST", "/" + "custom" + "/_search");
         XContentBuilder query = XContentBuilder.builder(XContentType.JSON.xContent())
@@ -303,7 +345,6 @@ public class OldMappingsIT extends ESRestTestCase {
         assertEquals(1.0d, (double) hit.get("_score"), 0.01d);
     }
 
-    @AnnotationTestOrdering.Order(16)
     public void testFieldsExistQueryOnTextField() throws IOException {
         Request search = new Request("POST", "/" + "custom" + "/_search");
         XContentBuilder query = XContentBuilder.builder(XContentType.JSON.xContent())
@@ -320,7 +361,6 @@ public class OldMappingsIT extends ESRestTestCase {
         assertThat(hits, hasSize(2));
     }
 
-    @AnnotationTestOrdering.Order(16)
     public void testSearchFieldsOnPlaceholderField() throws IOException {
         Request search = new Request("POST", "/" + "custom" + "/_search");
         XContentBuilder query = XContentBuilder.builder(XContentType.JSON.xContent())
@@ -345,7 +385,6 @@ public class OldMappingsIT extends ESRestTestCase {
         assertEquals(List.of("some_value"), fields.get("completion"));
     }
 
-    @AnnotationTestOrdering.Order(17)
     public void testNestedDocuments() throws IOException {
         Request search = new Request("POST", "/" + "nested" + "/_search");
         Map<String, Object> response = entityAsMap(client().performRequest(search));
@@ -388,30 +427,4 @@ public class OldMappingsIT extends ESRestTestCase {
         source = (Map<?, ?>) (XContentMapValues.extractValue("_source", (Map<?, ?>) hits.get(0)));
         assertEquals("fans", source.get("group"));
     }
-
-    @AnnotationTestOrdering.Order(20)
-    public void testRestartCluster() throws Exception {
-        closeClients();
-        cluster.upgradeNodeToVersion(0, org.elasticsearch.test.cluster.util.Version.CURRENT);
-        cluster.upgradeNodeToVersion(1, org.elasticsearch.test.cluster.util.Version.CURRENT);
-        initClient();
-    }
-
-    @AnnotationTestOrdering.Order(21)
-    public void testMappingOkAfterRestart() throws IOException {
-        doTestMappingOk();
-    }
-
-    private void doTestMappingOk() throws IOException {
-        Request mappingRequest = new Request("GET", "/" + "filebeat" + "/_mapping");
-        Map<String, Object> mapping = entityAsMap(client().performRequest(mappingRequest));
-        assertNotNull(XContentMapValues.extractValue(mapping, "filebeat", "mappings", "properties", "apache2"));
-
-        if (oldVersion.before(Version.fromString("6.0.0"))) {
-            mappingRequest = new Request("GET", "/" + "winlogbeat" + "/_mapping");
-            mapping = entityAsMap(client().performRequest(mappingRequest));
-            assertNotNull(XContentMapValues.extractValue(mapping, "winlogbeat", "mappings", "properties", "message"));
-        }
-    }
-
 }
