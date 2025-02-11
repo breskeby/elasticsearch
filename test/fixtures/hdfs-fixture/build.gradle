@@ -24,16 +24,19 @@ dependencies {
   registerTransform(org.elasticsearch.gradle.internal.dependencies.patches.hdfs.HdfsClassPatcher) {
     from.attribute(patched, false)
     to.attribute(patched, true)
+    parameters {
+      matchingArtifacts = ["hadoop-common"]
+    }
   }
 }
 
 configurations {
-  hdfs2
-  hdfs3 {
+  hdfs2 {
     attributes {
       attribute(patched, true)
     }
   }
+  hdfs3
   consumable("shadowedHdfs2")
 }
 

@@ -9,24 +9,19 @@
 
 package org.elasticsearch.gradle.internal.dependencies.patches.hdfs;
 
-import org.gradle.api.artifacts.transform.CacheableTransform;
-import org.gradle.api.artifacts.transform.InputArtifact;
-import org.gradle.api.artifacts.transform.TransformAction;
-import org.gradle.api.artifacts.transform.TransformOutputs;
-import org.gradle.api.artifacts.transform.TransformParameters;
+import org.gradle.api.artifacts.transform.*;
 import org.gradle.api.file.FileSystemLocation;
 import org.gradle.api.provider.Provider;
 import org.gradle.api.tasks.Classpath;
+import org.gradle.api.tasks.Input;
+import org.gradle.api.tasks.Optional;
 import org.objectweb.asm.ClassReader;
 import org.objectweb.asm.ClassVisitor;
 import org.objectweb.asm.ClassWriter;
 
-import java.io.File;
-import java.io.FileNotFoundException;
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.io.InputStream;
+import java.io.*;
 import java.util.Enumeration;
+import java.util.List;
 import java.util.Map;
 import java.util.function.Function;
 import java.util.jar.JarEntry;
@@ -34,7 +29,7 @@ import java.util.jar.JarFile;
 import java.util.jar.JarOutputStream;
 
 @CacheableTransform
-public abstract class HdfsClassPatcher implements TransformAction<TransformParameters.None> {
+public abstract class HdfsClassPatcher implements TransformAction<HdfsClassPatcher.Parameters> {
     static final Map<String, Function<ClassWriter, ClassVisitor>> patchers = Map.of(
         "org/apache/hadoop/util/ShutdownHookManager.class",
         ShutdownHookManagerPatcher::new,
@@ -46,6 +41,13 @@ public abstract class HdfsClassPatcher implements TransformAction<TransformParam
         SubjectGetSubjectPatcher::new
     );
 
+    interface Parameters extends TransformParameters {
+        @Input
+        @Optional
+        List<String> getMatchingArtifacts();
+        void setMatchingArtifacts(List<String> matchingArtifacts);
+    }
+
     @Classpath
     @InputArtifact
     public abstract Provider<FileSystemLocation> getInputArtifact();
@@ -53,23 +55,22 @@ public abstract class HdfsClassPatcher implements TransformAction<TransformParam
     @Override
     public void transform(TransformOutputs outputs) {
         File inputFile = getInputArtifact().get().getAsFile();
-        System.out.println("inputFile = " + inputFile);
-        if(inputFile.getName().toLowerCase().contains("hdfs")) {
+        List<String> matchingArtifacts = getParameters().getMatchingArtifacts();
+        if (matchingArtifacts.isEmpty() == false && matchingArtifacts.stream().noneMatch(supported -> inputFile.getName().contains(supported))) {
+            outputs.file(getInputArtifact());
+        } else {
             File outputFile = outputs.file(inputFile.getName().replace(".jar", "-patched.jar"));
-
-            System.out.println("outputFile = " + outputFile);
-            try (JarFile jarFile = new JarFile(inputFile);
-                 JarOutputStream jos = new JarOutputStream(new FileOutputStream(outputFile))) {
+            try (JarFile jarFile = new JarFile(inputFile); JarOutputStream jos = new JarOutputStream(new FileOutputStream(outputFile))) {
                 Enumeration<JarEntry> entries = jarFile.entries();
                 while (entries.hasMoreElements()) {
                     JarEntry entry = entries.nextElement();
                     String entryName = entry.getName();
                     // Add the entry to the new JAR file
                     jos.putNextEntry(new JarEntry(entryName));
-                    System.out.println("EntryName = " + entryName);
+                    // System.out.println("EntryName = " + entryName);
                     if (patchers.containsKey(entryName)) {
                         Function<ClassWriter, ClassVisitor> patcher = patchers.get(entryName);
-                        System.out.println("Patching " + entryName);
+                        System.out.println("[HdfsClassPatcher] Patching " + entryName + " in " + inputFile.getName());
                         byte[] classToPatch = jarFile.getInputStream(entry).readAllBytes();
                         ClassReader classReader = new ClassReader(classToPatch);
                         ClassWriter classWriter = new ClassWriter(classReader, 0);
