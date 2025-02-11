@@ -13,10 +13,27 @@ apply plugin: 'com.gradleup.shadow'
 
 import com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar
 
+def patched = Attribute.of('patched', Boolean)
+dependencies {
+  attributesSchema {
+    attribute(patched)
+  }
+  artifactTypes.getByName("jar") {
+    attributes.attribute(patched, false)
+  }
+  registerTransform(org.elasticsearch.gradle.internal.dependencies.patches.hdfs.HdfsClassPatcher) {
+    from.attribute(patched, false)
+    to.attribute(patched, true)
+  }
+}
+
 configurations {
   hdfs2
-  hdfs3
-  patcher
+  hdfs3 {
+    attributes {
+      attribute(patched, true)
+    }
+  }
   consumable("shadowedHdfs2")
 }
 
@@ -87,21 +104,21 @@ dependencies {
     exclude group: "org.xerial.snappy", module: "snappy-java"
   }
 
-  patcher(project(':plugins:repository-hdfs:hadoop-common-patcher'))
+//  patcher(project(':plugins:repository-hdfs:hadoop-common-patcher'))
 }
 
-def outputDir = layout.buildDirectory.dir("patched-classes")
+//def outputDir = layout.buildDirectory.dir("patched-classes")
 
-def patchTask = tasks.register("patchClasses", JavaExec) {
-  inputs.files(configurations.hdfs2).withPathSensitivity(PathSensitivity.RELATIVE)
-  outputs.dir(outputDir)
-  classpath = configurations.patcher
-  mainClass = 'org.elasticsearch.hdfs.patch.HdfsClassPatcher'
-  def jarToPatch = configurations.hdfs2.getFiles().find { f -> f.getName().endsWith("hadoop-common-2.8.5.jar")}
-  doFirst {
-    args(jarToPatch, outputDir.get().asFile)
-  }
-}
+//def patchTask = tasks.register("patchClasses", JavaExec) {
+//  inputs.files(configurations.hdfs2).withPathSensitivity(PathSensitivity.RELATIVE)
+//  outputs.dir(outputDir)
+//  classpath = configurations.patcher
+//  mainClass = 'org.elasticsearch.hdfs.patch.HdfsClassPatcher'
+//  def jarToPatch = configurations.hdfs2.getFiles().find { f -> f.getName().endsWith("hadoop-common-2.8.5.jar")}
+//  doFirst {
+//    args(jarToPatch, outputDir.get().asFile)
+//  }
+//}
 
 tasks.named("shadowJar").configure {
   archiveClassifier.set("hdfs3")
@@ -120,7 +137,7 @@ def hdfs2Jar = tasks.register("hdfs2jar", ShadowJar) {
   }
   archiveClassifier.set("hdfs2")
   from sourceSets.main.output
-  from patchTask
+//  from patchTask
   configurations.add(project.configurations.hdfs2)
 }
 
