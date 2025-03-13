@@ -13,7 +13,7 @@ import org.elasticsearch.cli.ExitCodes;
 import org.elasticsearch.common.Strings;
 import org.elasticsearch.common.ssl.PemKeyConfig;
 import org.elasticsearch.packaging.util.FileMatcher;
-import org.elasticsearch.packaging.util.Installation;
+import org.elasticsearch.packaging.util.DefaultInstallation;
 import org.elasticsearch.packaging.util.Packages;
 import org.elasticsearch.packaging.util.Shell;
 import org.elasticsearch.test.http.MockResponse;
@@ -98,7 +98,7 @@ public class PackagesSecurityAutoConfigurationTests extends PackagingTestCase {
     public void test40SecurityNotAutoConfiguredWhenExistingKeystoreUnknownPassword() throws Exception {
         // This is a contrived example for packages where in a new installation, there is an
         // existing elasticsearch.keystore file within $ES_PATH_CONF and it's password-protected
-        final Installation.Executables bin = installation.executables();
+        final DefaultInstallation.Executables bin = installation.executables();
         bin.keystoreTool.run("passwd", "some_password\nsome_password\n");
         final Path tempDir = createTempDir("existing-keystore-config");
         final Path confPath = installation.config;

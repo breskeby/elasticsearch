@@ -446,6 +446,11 @@ void addBuildDockerImageTask(Architecture architecture, DockerBase base) {
 
         baseImages = [baseImage]
         buildArgs = buildArgsMap
+      } else if(base == DockerBase.FIPS && architecture == Architecture.AARCH64) {
+        // there is no official fips compliant chainguard base fips image for aarch64
+        // for easier testing on local systems we fall back to the wolfi base image which is chainguard base
+        // this is for local development only
+        baseImages = [DockerBase.WOLFI.image]
       } else {
         baseImages = [base.image]
       }

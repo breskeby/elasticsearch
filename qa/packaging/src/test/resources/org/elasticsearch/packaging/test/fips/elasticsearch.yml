@@ -1,0 +1,23 @@
+xpack.security.transport.ssl.enabled: true
+xpack.security.transport.ssl.key: node1.key
+xpack.security.transport.ssl.certificate: node1.crt
+xpack.security.transport.ssl.certificate_authorities: ca.crt
+#xpack.security.transport.ssl.secure_key_passphrase: password123password
+xpack.security.http.ssl.enabled: true
+xpack.security.http.ssl.key: localhost.key
+xpack.security.http.ssl.certificate: localhost.crt
+#xpack.security.http.ssl.secure_key_passphrase: password123forHTTP
+xpack.license.self_generated.type: trial #only for testing, cloud uses an enterprise license
+xpack.security.fips_mode.enabled: false
+xpack.security.enabled: true
+xpack.security.autoconfiguration.enabled: false
+xpack.security.authc.reserved_realm.enabled: false # Cloud uses file users instead
+xpack.security.fips_mode.required_providers: ["BCFIPS", "BCJSSE"]
+#logger.org.elasticsearch.xpack.security: trace # this can be useful to see the security providers
+
+cluster.name: fipstest
+transport.port: 9410
+http.port: 9210
+cluster.initial_master_nodes: 127.0.0.1:9410
+discovery.seed_hosts: 127.0.0.1:9410
+node.roles: [ data, master]

@@ -10,6 +10,7 @@
 package org.elasticsearch.packaging.test;
 
 import org.elasticsearch.packaging.util.FileUtils;
+import org.elasticsearch.packaging.util.DefaultInstallation;
 import org.elasticsearch.packaging.util.Installation;
 import org.elasticsearch.packaging.util.Packages;
 import org.elasticsearch.packaging.util.Platforms;
@@ -51,7 +52,7 @@ public class PluginCliTests extends PackagingTestCase {
         void run(Shell.Result installResult) throws Exception;
     }
 
-    private Shell.Result assertWithPlugin(Installation.Executable pluginTool, Path pluginZip, String pluginName, PluginAction action)
+    private Shell.Result assertWithPlugin(DefaultInstallation.Executable pluginTool, Path pluginZip, String pluginName, PluginAction action)
         throws Exception {
         Shell.Result installResult = pluginTool.run("install --batch \"" + pluginZip.toUri() + "\"");
         action.run(installResult);
@@ -105,10 +106,8 @@ public class PluginCliTests extends PackagingTestCase {
         Path spacedDir = createTempDir("spaced dir");
         Path elasticsearch = spacedDir.resolve("elasticsearch");
         Files.move(installation.home, elasticsearch);
-        Installation spacedInstallation = Installation.ofArchive(sh, distribution, elasticsearch);
-
+        DefaultInstallation spacedInstallation = Installation.ofArchive(sh, distribution, elasticsearch);
         assertWithPlugin(spacedInstallation.executables().pluginTool, EXAMPLE_PLUGIN_ZIP, EXAMPLE_PLUGIN_NAME, installResult -> {});
-
         Files.move(elasticsearch, installation.home);
     }
 

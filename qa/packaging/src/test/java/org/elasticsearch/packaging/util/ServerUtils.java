@@ -68,7 +68,7 @@ public class ServerUtils {
     private static final long requestInterval = TimeUnit.SECONDS.toMillis(5);
     private static final long dockerWaitForSecurityIndex = TimeUnit.SECONDS.toMillis(60);
 
-    public static void waitForElasticsearch(Installation installation) throws Exception {
+    public static void waitForElasticsearch(DefaultInstallation installation) throws Exception {
         final boolean securityEnabled;
 
         if (installation.distribution.isDocker() == false) {
@@ -154,7 +154,7 @@ public class ServerUtils {
     }
 
     // polls every two seconds for Elasticsearch to be running on 9200
-    private static void waitForXpack(Installation installation) {
+    private static void waitForXpack(DefaultInstallation installation) {
         int retries = 60;
         while (retries > 0) {
             retries -= 1;
@@ -178,7 +178,7 @@ public class ServerUtils {
         throw new RuntimeException("Elasticsearch (with x-pack) did not start");
     }
 
-    public static Path getCaCert(Installation installation) throws IOException {
+    public static Path getCaCert(DefaultInstallation installation) throws IOException {
         if (installation.distribution.isDocker()) {
             final Path tempDir = PackagingTestCase.createTempDir("docker-ssl");
             final Path autoConfigurationDir = findInContainer(installation.config, "d", "\"certs\"");
@@ -225,7 +225,7 @@ public class ServerUtils {
     public static void waitForElasticsearch(
         String status,
         String index,
-        Installation installation,
+        DefaultInstallation installation,
         String username,
         String password,
         Path caCert
@@ -373,7 +373,7 @@ public class ServerUtils {
         return response.getStatusLine().getStatusCode();
     }
 
-    public static void disableGeoIpDownloader(Installation installation) throws IOException {
+    public static void disableGeoIpDownloader(DefaultInstallation installation) throws IOException {
         // We don't use addSettingToExistingConfiguration because it would overwrite comments in the settings file
         // and we might want to check for them later on to test auto-configuration
         Path yml = installation.config("elasticsearch.yml");
@@ -385,14 +385,14 @@ public class ServerUtils {
         Files.write(yml, lines, TRUNCATE_EXISTING);
     }
 
-    public static void enableGeoIpDownloader(Installation installation) throws IOException {
+    public static void enableGeoIpDownloader(DefaultInstallation installation) throws IOException {
         removeSettingFromExistingConfiguration(installation, "ingest.geoip.downloader.enabled");
     }
 
     /**
      * Explicitly disables security features
      */
-    public static void disableSecurityFeatures(Installation installation) throws IOException {
+    public static void disableSecurityFeatures(DefaultInstallation installation) throws IOException {
         Path yamlFile = installation.config("elasticsearch.yml");
         final Settings settings = Settings.builder().loadFromPath(yamlFile).build();
         final Settings newSettings = Settings.builder()
@@ -409,23 +409,23 @@ public class ServerUtils {
 
     }
 
-    public static void enableSecurityFeatures(Installation installation) throws IOException {
+    public static void enableSecurityFeatures(DefaultInstallation installation) throws IOException {
         removeSettingFromExistingConfiguration(installation, "xpack.security.enabled");
     }
 
-    public static void disableSecurityAutoConfiguration(Installation installation) throws IOException {
+    public static void disableSecurityAutoConfiguration(DefaultInstallation installation) throws IOException {
         addSettingToExistingConfiguration(installation, "xpack.security.autoconfiguration.enabled", "false");
     }
 
-    public static void enableSecurityAutoConfiguration(Installation installation) throws IOException {
+    public static void enableSecurityAutoConfiguration(DefaultInstallation installation) throws IOException {
         removeSettingFromExistingConfiguration(installation, "xpack.security.autoconfiguration.enabled");
     }
 
-    public static void addSettingToExistingConfiguration(Installation installation, String setting, String value) throws IOException {
+    public static void addSettingToExistingConfiguration(DefaultInstallation installation, String setting, String value) throws IOException {
         addSettingToExistingConfiguration(installation.config, setting, value);
     }
 
-    public static void removeSettingFromExistingConfiguration(Installation installation, String setting) throws IOException {
+    public static void removeSettingFromExistingConfiguration(DefaultInstallation installation, String setting) throws IOException {
         removeSettingFromExistingConfiguration(installation.config, setting);
     }
 

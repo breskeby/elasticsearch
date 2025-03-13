@@ -79,11 +79,11 @@ public class Packages {
         return runPackageManager(distribution, new Shell(), PackageManagerCommand.QUERY);
     }
 
-    public static Installation installPackage(Shell sh, Distribution distribution) throws Exception {
+    public static DefaultInstallation installPackage(Shell sh, Distribution distribution) throws Exception {
         return installPackage(sh, distribution, null);
     }
 
-    public static Installation installPackage(Shell sh, Distribution distribution, @Nullable Predicate<String> outputPredicate)
+    public static DefaultInstallation installPackage(Shell sh, Distribution distribution, @Nullable Predicate<String> outputPredicate)
         throws IOException {
         String systemJavaHome = sh.run("echo $SYSTEM_JAVA_HOME").stdout().trim();
         if (distribution.hasJdk == false) {
@@ -96,7 +96,7 @@ public class Packages {
         if (null != outputPredicate) {
             assertThat(outputPredicate.test(result.stdout()), is(true));
         }
-        Installation installation = Installation.ofPackage(sh, distribution);
+        DefaultInstallation installation = Installation.ofPackage(sh, distribution);
         installation.setElasticPassword(captureElasticPasswordFromOutput(result));
         if (distribution.hasJdk == false) {
             Files.write(installation.envFile, List.of("ES_JAVA_HOME=" + systemJavaHome), StandardOpenOption.APPEND);
@@ -117,7 +117,7 @@ public class Packages {
             .orElse(null);
     }
 
-    public static Installation upgradePackage(Shell sh, Distribution distribution) throws IOException {
+    public static DefaultInstallation upgradePackage(Shell sh, Distribution distribution) throws IOException {
         final Result result = runPackageManager(distribution, sh, PackageManagerCommand.UPGRADE);
         if (result.exitCode() != 0) {
             throw new RuntimeException("Upgrading distribution " + distribution + " failed: " + result);
@@ -126,7 +126,7 @@ public class Packages {
         return Installation.ofPackage(sh, distribution);
     }
 
-    public static Installation forceUpgradePackage(Shell sh, Distribution distribution) throws IOException {
+    public static DefaultInstallation forceUpgradePackage(Shell sh, Distribution distribution) throws IOException {
         final Result result = runPackageManager(distribution, sh, PackageManagerCommand.FORCE_UPGRADE);
         if (result.exitCode() != 0) {
             throw new RuntimeException("Force upgrading distribution " + distribution + " failed: " + result);
@@ -173,12 +173,12 @@ public class Packages {
         });
     }
 
-    public static void verifyPackageInstallation(Installation installation, Distribution distribution, Shell sh) throws IOException {
+    public static void verifyPackageInstallation(DefaultInstallation installation, Distribution distribution, Shell sh) throws IOException {
         verifyOssInstallation(installation, distribution, sh);
         verifyDefaultInstallation(installation, distribution);
     }
 
-    private static void verifyOssInstallation(Installation es, Distribution distribution, Shell sh) {
+    private static void verifyOssInstallation(DefaultInstallation es, Distribution distribution, Shell sh) {
 
         sh.run("id elasticsearch");
         sh.run("getent group elasticsearch");
@@ -236,7 +236,7 @@ public class Packages {
         }
     }
 
-    private static void verifyDefaultInstallation(Installation es, Distribution distribution) {
+    private static void verifyDefaultInstallation(DefaultInstallation es, Distribution distribution) {
 
         Stream.of(
             "elasticsearch-certgen",
@@ -277,7 +277,7 @@ public class Packages {
         return sh.runIgnoreExitCode("service elasticsearch start");
     }
 
-    public static void assertElasticsearchStarted(Shell sh, Installation installation) throws Exception {
+    public static void assertElasticsearchStarted(Shell sh, DefaultInstallation installation) throws Exception {
         waitForElasticsearch(installation);
 
         if (isSystemd()) {
@@ -296,7 +296,7 @@ public class Packages {
         }
     }
 
-    public static void restartElasticsearch(Shell sh, Installation installation) throws Exception {
+    public static void restartElasticsearch(Shell sh, DefaultInstallation installation) throws Exception {
         if (isSystemd()) {
             sh.run("systemctl restart elasticsearch.service");
         } else {

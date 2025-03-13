@@ -14,7 +14,7 @@ import org.apache.http.entity.ContentType;
 import org.elasticsearch.Version;
 import org.elasticsearch.packaging.util.Distribution;
 import org.elasticsearch.packaging.util.FileUtils;
-import org.elasticsearch.packaging.util.Installation;
+import org.elasticsearch.packaging.util.DefaultInstallation;
 import org.elasticsearch.packaging.util.Packages;
 import org.elasticsearch.packaging.util.ServerUtils;
 import org.junit.BeforeClass;
@@ -121,7 +121,7 @@ public class PackageUpgradeTests extends PackagingTestCase {
         assertThat(response3, containsString("Darkness"));
     }
 
-    private void possiblyRemoveSecurityConfiguration(Installation es) throws IOException {
+    private void possiblyRemoveSecurityConfiguration(DefaultInstallation es) throws IOException {
         ServerUtils.disableSecurityFeatures(es);
         if (Files.exists(es.config("certs"))) {
             FileUtils.rm(es.config("certs"));

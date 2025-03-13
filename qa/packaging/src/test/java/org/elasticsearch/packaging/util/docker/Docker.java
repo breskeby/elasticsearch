@@ -19,12 +19,18 @@ import org.apache.http.client.fluent.Request;
 import org.elasticsearch.common.Strings;
 import org.elasticsearch.core.CheckedRunnable;
 import org.elasticsearch.core.Nullable;
+import org.elasticsearch.packaging.util.DefaultInstallation;
 import org.elasticsearch.packaging.util.Distribution;
 import org.elasticsearch.packaging.util.Distribution.Packaging;
 import org.elasticsearch.packaging.util.FileUtils;
 import org.elasticsearch.packaging.util.Installation;
 import org.elasticsearch.packaging.util.ServerUtils;
 import org.elasticsearch.packaging.util.Shell;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.testcontainers.containers.GenericContainer;
+import org.testcontainers.containers.output.Slf4jLogConsumer;
+import org.testcontainers.utility.MountableFile;
 
 import java.io.FileNotFoundException;
 import java.nio.file.InvalidPathException;
@@ -74,6 +80,7 @@ public class Docker {
     public static final DockerShell dockerShell = new DockerShell();
     public static final int STARTUP_SLEEP_INTERVAL_MILLISECONDS = 1000;
     public static final int STARTUP_ATTEMPTS_MAX = 30;
+    protected static final Logger LOGGER = LoggerFactory.getLogger(Docker.class);
 
     /**
      * Tracks the currently running Docker image. An earlier implementation used a fixed container name,
@@ -118,11 +125,42 @@ public class Docker {
      * @return an installation that models the running container
      */
     public static Installation runContainer(Distribution distribution, DockerRun builder) {
-        executeDockerRun(distribution, builder);
+        var fipsResources = List.of(
+            "ca.crt",
+            "ca.key",
+            "elasticsearch.yml",
+            "elasticsearch.keystore",
+            "localhost.crt",
+            "localhost.key",
+            "node1.crt",
+            "node1.key",
+            "users",
+            "users_roles"
+        );
 
-        waitForElasticsearchToStart();
+        GenericContainer<?> dockerContainer = new GenericContainer<>(getImageName(distribution)).withCreateContainerCmdModifier(
+            cmd -> cmd.getHostConfig().withMemory(2 * 1024 * 1024 * 1024L)
+        );
+        fipsResources.forEach(
+            file -> dockerContainer.withCopyFileToContainer(
+                MountableFile.forClasspathResource("/org/elasticsearch/packaging/test/fips/" + file),
+                "/usr/share/elasticsearch/config/" + file
+            )
+        );
+        dockerContainer.withLogConsumer(new Slf4jLogConsumer(LOGGER)).withExposedPorts(9200);
+        dockerContainer.start();
+        //
+        // .withCopyFileToContainer(MountableFile.forClasspathResource("roles.yml"), "/usr/share/elasticsearch/config/roles.yml")
+        // .withCopyFileToContainer(MountableFile.forClasspathResource("users"), "/usr/share/elasticsearch/config/users")
+        // .withCopyFileToContainer(MountableFile.forClasspathResource("users_roles"), "/usr/share/elasticsearch/config/users_roles")
+        // .withLogConsumer(new Slf4jLogConsumer(LOGGER))
+        // .withExposedPorts(9200);
+        //
+        // executeDockerRun(distribution, builder);
 
-        return Installation.ofContainer(dockerShell, distribution);
+        // waitForElasticsearchToStart();
+
+        return Installation.ofContainer(dockerContainer, distribution);
     }
 
     /**
@@ -135,7 +173,12 @@ public class Docker {
      * @param transportPort the port to expose the transport endpoint on
      * @return an installation that models the running container
      */
-    public static Installation runAdditionalContainer(Distribution distribution, DockerRun builder, int restPort, int transportPort) {
+    public static DefaultInstallation runAdditionalContainer(
+        Distribution distribution,
+        DockerRun builder,
+        int restPort,
+        int transportPort
+    ) {
         // TODO Maybe revisit this as part of https://github.com/elastic/elasticsearch/issues/79688
         final String command = builder.distribution(distribution)
             .extraArgs("--publish", transportPort + ":9300", "--publish", restPort + ":9200")
@@ -223,7 +266,10 @@ public class Docker {
      */
     private static String getThreadDump() {
         try {
-            String pid = dockerShell.run("/usr/share/elasticsearch/jdk/bin/jps | grep -v 'Jps' | awk '{print $1}'").stdout();
+            String pid = dockerShell.run("/usr/share/elasticsearch/jdk/bin/jps | grep -v 'Jps' | cut -d ' ' -f 1")
+                .stdout()
+                .replaceAll("\n", "")
+                .trim();
             if (pid.isEmpty() == false) {
                 return dockerShell.run("/usr/share/elasticsearch/jdk/bin/jstack " + Integer.parseInt(pid)).stdout();
             }
@@ -501,7 +547,7 @@ public class Docker {
      * Perform a variety of checks on an installation.
      * @param es the installation to verify
      */
-    public static void verifyContainerInstallation(Installation es) {
+    public static void verifyContainerInstallation(DefaultInstallation es) {
         // Ensure the `elasticsearch` user and group exist.
         // These lines will both throw an exception if the command fails
         dockerShell.run("id elasticsearch");
@@ -556,7 +602,7 @@ public class Docker {
         }
     }
 
-    private static void verifyCloudContainerInstallation(Installation es) {
+    private static void verifyCloudContainerInstallation(DefaultInstallation es) {
         final String pluginArchive = "/opt/plugins/archive";
         final List<String> plugins = listContents(pluginArchive);
 
@@ -586,11 +632,11 @@ public class Docker {
             );
     }
 
-    public static void waitForElasticsearch(Installation installation) throws Exception {
+    public static void waitForElasticsearch(DefaultInstallation installation) throws Exception {
         withLogging(() -> ServerUtils.waitForElasticsearch(installation));
     }
 
-    public static void waitForElasticsearch(Installation installation, String username, String password) {
+    public static void waitForElasticsearch(DefaultInstallation installation, String username, String password) {
         waitForElasticsearch(installation, username, password, null);
     }
 
@@ -602,7 +648,7 @@ public class Docker {
      * @param password the password to authenticate with
      * @param caCert the CA cert to trust
      */
-    public static void waitForElasticsearch(Installation installation, String username, String password, Path caCert) {
+    public static void waitForElasticsearch(DefaultInstallation installation, String username, String password, Path caCert) {
         try {
             withLogging(() -> ServerUtils.waitForElasticsearch("green", null, installation, username, password, caCert));
         } catch (Exception e) {

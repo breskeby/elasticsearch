@@ -52,11 +52,11 @@ public class Archives {
     // in the future we'll run as a role user on Windows
     public static final String ARCHIVE_OWNER = Platforms.WINDOWS ? System.getenv("username") : "elasticsearch";
 
-    public static Installation installArchive(Shell sh, Distribution distribution) throws Exception {
+    public static DefaultInstallation installArchive(Shell sh, Distribution distribution) throws Exception {
         return installArchive(sh, distribution, getDefaultArchiveInstallPath(), getCurrentVersion(), false);
     }
 
-    public static Installation installArchive(
+    public static DefaultInstallation installArchive(
         Shell sh,
         Distribution distribution,
         Path fullInstallPath,
@@ -111,7 +111,7 @@ public class Archives {
 
         sh.chown(fullInstallPath);
 
-        Installation installation = Installation.ofArchive(sh, distribution, fullInstallPath);
+        DefaultInstallation installation = Installation.ofArchive(sh, distribution, fullInstallPath);
         ServerUtils.disableGeoIpDownloader(installation);
 
         return installation;
@@ -154,12 +154,12 @@ public class Archives {
         }
     }
 
-    public static void verifyArchiveInstallation(Installation installation, Distribution distribution) {
+    public static void verifyArchiveInstallation(DefaultInstallation installation, Distribution distribution) {
         verifyOssInstallation(installation, distribution, ARCHIVE_OWNER);
         verifyDefaultInstallation(installation, distribution, ARCHIVE_OWNER);
     }
 
-    private static void verifyOssInstallation(Installation es, Distribution distribution, String owner) {
+    private static void verifyOssInstallation(DefaultInstallation es, Distribution distribution, String owner) {
         Stream.of(es.home, es.config, es.plugins, es.modules, es.logs).forEach(dir -> assertThat(dir, file(Directory, owner, owner, p755)));
 
         assertThat(Files.exists(es.data), is(false));
@@ -196,7 +196,7 @@ public class Archives {
             .forEach(doc -> assertThat(es.home.resolve(doc), file(File, owner, owner, p644)));
     }
 
-    private static void verifyDefaultInstallation(Installation es, Distribution distribution, String owner) {
+    private static void verifyDefaultInstallation(DefaultInstallation es, Distribution distribution, String owner) {
 
         Stream.of(
             "elasticsearch-certgen",
@@ -229,7 +229,7 @@ public class Archives {
      * Starts an elasticsearch node from an attached terminal, optionally waiting for a specific string to be printed in stdout
      */
     public static Shell.Result startElasticsearchWithTty(
-        Installation installation,
+        DefaultInstallation installation,
         Shell sh,
         String keystorePassword,
         List<String> parameters,
@@ -237,7 +237,7 @@ public class Archives {
         boolean daemonize
     ) {
         final Path pidFile = installation.home.resolve("elasticsearch.pid");
-        final Installation.Executables bin = installation.executables();
+        final DefaultInstallation.Executables bin = installation.executables();
 
         // requires the "expect" utility to be installed
         List<String> command = new ArrayList<>();
@@ -279,7 +279,7 @@ public class Archives {
     }
 
     public static Shell.Result runElasticsearchStartCommand(
-        Installation installation,
+        DefaultInstallation installation,
         Shell sh,
         String keystorePassword,
         List<String> parameters,
@@ -289,7 +289,7 @@ public class Archives {
 
         assertThat(pidFile, fileDoesNotExist());
 
-        final Installation.Executables bin = installation.executables();
+        final DefaultInstallation.Executables bin = installation.executables();
 
         if (Platforms.WINDOWS == false) {
             // If jayatana is installed then we try to use it. Elasticsearch should ignore it even when we try.
@@ -335,7 +335,7 @@ public class Archives {
         }
     }
 
-    public static void assertElasticsearchStarted(Installation installation) throws Exception {
+    public static void assertElasticsearchStarted(DefaultInstallation installation) throws Exception {
         final Path pidFile = installation.home.resolve("elasticsearch.pid");
         ServerUtils.waitForElasticsearch(installation);
 
@@ -344,7 +344,7 @@ public class Archives {
         assertThat(pid, is(not(emptyOrNullString())));
     }
 
-    public static void stopElasticsearch(Installation installation) throws Exception {
+    public static void stopElasticsearch(DefaultInstallation installation) throws Exception {
         Path pidFile = installation.home.resolve("elasticsearch.pid");
         assertThat(pidFile, fileExists());
         String pid = slurp(pidFile).trim();

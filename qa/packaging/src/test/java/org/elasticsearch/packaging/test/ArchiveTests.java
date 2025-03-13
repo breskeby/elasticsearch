@@ -14,7 +14,7 @@ import com.carrotsearch.randomizedtesting.RandomizedTest;
 import org.apache.http.client.fluent.Request;
 import org.elasticsearch.packaging.util.Distribution;
 import org.elasticsearch.packaging.util.FileUtils;
-import org.elasticsearch.packaging.util.Installation;
+import org.elasticsearch.packaging.util.DefaultInstallation;
 import org.elasticsearch.packaging.util.Platforms;
 import org.elasticsearch.packaging.util.ServerUtils;
 import org.elasticsearch.packaging.util.Shell;
@@ -78,14 +78,14 @@ public class ArchiveTests extends PackagingTestCase {
     }
 
     public void test20PluginsListWithNoPlugins() throws Exception {
-        final Installation.Executables bin = installation.executables();
+        final DefaultInstallation.Executables bin = installation.executables();
         final Result r = bin.pluginTool.run("list");
 
         assertThat(r.stdout(), emptyString());
     }
 
     public void test31BadJavaHome() throws Exception {
-        final Installation.Executables bin = installation.executables();
+        final DefaultInstallation.Executables bin = installation.executables();
         sh.getEnv().put("ES_JAVA_HOME", "doesnotexist");
 
         // ask for elasticsearch version to quickly exit if java is actually found (ie test failure)
@@ -95,7 +95,7 @@ public class ArchiveTests extends PackagingTestCase {
     }
 
     public void test32SpecialCharactersInJdkPath() throws Exception {
-        final Installation.Executables bin = installation.executables();
+        final DefaultInstallation.Executables bin = installation.executables();
         assumeTrue("Only run this test when we know where the JDK is.", distribution().hasJdk);
 
         final Path relocatedJdk = installation.bundledJdk.getParent().resolve("a (special) path");
@@ -229,7 +229,7 @@ public class ArchiveTests extends PackagingTestCase {
         /* Windows issue awaits fix: https://github.com/elastic/elasticsearch/issues/49340 */
         assumeTrue("expect command isn't on Windows", distribution.platform != Distribution.Platform.WINDOWS);
         FileUtils.assertPathsDoNotExist(installation.data);
-        final Installation.Executables bin = installation.executables();
+        final DefaultInstallation.Executables bin = installation.executables();
         final String password = "some-keystore-password";
         Platforms.onLinux(() -> bin.keystoreTool.run("passwd", password + "\n" + password + "\n"));
         Platforms.onWindows(() -> {
@@ -309,7 +309,7 @@ public class ArchiveTests extends PackagingTestCase {
             sh.getEnv().remove("ES_JAVA_HOME");
         });
 
-        final Installation.Executables bin = installation.executables();
+        final DefaultInstallation.Executables bin = installation.executables();
         final Result runResult = sh.run(bin.elasticsearch.toString() + " -V");
         assertThat(runResult.stderr(), containsString("warning: ignoring JAVA_HOME=" + systemJavaHome + "; using bundled JDK"));
 
@@ -530,7 +530,7 @@ public class ArchiveTests extends PackagingTestCase {
     }
 
     public void test90SecurityCliPackaging() throws Exception {
-        final Installation.Executables bin = installation.executables();
+        final DefaultInstallation.Executables bin = installation.executables();
 
         assertThat(installation.lib.resolve("tools").resolve("security-cli"), fileExists());
         final Platforms.PlatformAction action = () -> {
@@ -547,7 +547,7 @@ public class ArchiveTests extends PackagingTestCase {
     }
 
     public void test91ElasticsearchShardCliPackaging() throws Exception {
-        final Installation.Executables bin = installation.executables();
+        final DefaultInstallation.Executables bin = installation.executables();
 
         Platforms.PlatformAction action = () -> {
             final Result result = sh.run(bin.shardTool + " -h");
@@ -559,7 +559,7 @@ public class ArchiveTests extends PackagingTestCase {
     }
 
     public void test92ElasticsearchNodeCliPackaging() throws Exception {
-        final Installation.Executables bin = installation.executables();
+        final DefaultInstallation.Executables bin = installation.executables();
 
         Platforms.PlatformAction action = () -> {
             final Result result = sh.run(bin.nodeTool + " -h");
@@ -588,7 +588,7 @@ public class ArchiveTests extends PackagingTestCase {
     }
 
     public void test94ElasticsearchNodeExecuteCliNotEsHomeWorkDir() throws Exception {
-        final Installation.Executables bin = installation.executables();
+        final DefaultInstallation.Executables bin = installation.executables();
         // Run the cli tools from the tmp dir
         sh.setWorkingDirectory(getRootTempDir());
 

@@ -29,6 +29,7 @@ import org.elasticsearch.packaging.util.Archives;
 import org.elasticsearch.packaging.util.Distribution;
 import org.elasticsearch.packaging.util.FileMatcher;
 import org.elasticsearch.packaging.util.FileUtils;
+import org.elasticsearch.packaging.util.DefaultInstallation;
 import org.elasticsearch.packaging.util.Installation;
 import org.elasticsearch.packaging.util.Packages;
 import org.elasticsearch.packaging.util.Platforms;
@@ -36,6 +37,7 @@ import org.elasticsearch.packaging.util.ServerUtils;
 import org.elasticsearch.packaging.util.Shell;
 import org.elasticsearch.packaging.util.docker.Docker;
 import org.elasticsearch.packaging.util.docker.DockerFileMatcher;
+import org.elasticsearch.packaging.util.docker.DockerRun;
 import org.elasticsearch.packaging.util.docker.DockerShell;
 import org.hamcrest.CoreMatchers;
 import org.hamcrest.Matcher;
@@ -113,6 +115,7 @@ public abstract class PackagingTestCase extends Assert {
         /** Point to JIRA entry. */
         String bugUrl();
     }
+
 
     protected final Logger logger = LogManager.getLogger(getClass());
 
@@ -193,8 +196,8 @@ public abstract class PackagingTestCase extends Assert {
             Platforms.onWindows(() -> sh.getEnv().put("ES_JAVA_HOME", systemJavaHome));
         }
         if (installation != null
-            && installation.distribution.isDocker() == false
-            && Version.fromString(installation.distribution.baseVersion).onOrAfter(Version.V_7_11_0)) {
+            && (installation instanceof Installation.DockerInstallation) == false
+            && Version.fromString(((DefaultInstallation)installation).distribution.baseVersion).onOrAfter(Version.V_7_11_0)) {
             // Explicitly set heap for versions 7.11 and later otherwise auto heap sizing will cause OOM issues
             setHeap("1g");
         }
@@ -247,6 +250,10 @@ public abstract class PackagingTestCase extends Assert {
             }
             case DOCKER, DOCKER_IRON_BANK, DOCKER_CLOUD_ESS, DOCKER_WOLFI -> {
                 installation = Docker.runContainer(distribution);
+                Docker.verifyContainerInstallation(installation);
+            }
+            case DOCKER_FIPS -> {
+                installation = Docker.runContainer(distribution, DockerRun.builder());
                 Docker.verifyContainerInstallation(installation);
             }
             default -> throw new IllegalStateException("Unknown Elasticsearch packaging type.");
@@ -336,6 +343,7 @@ public abstract class PackagingTestCase extends Assert {
             case DOCKER_IRON_BANK:
             case DOCKER_CLOUD_ESS:
             case DOCKER_WOLFI:
+            case DOCKER_FIPS:
                 // nothing, "installing" docker image is running it
                 return Shell.NO_OP;
             default:
@@ -357,6 +365,7 @@ public abstract class PackagingTestCase extends Assert {
             case DOCKER_IRON_BANK:
             case DOCKER_CLOUD_ESS:
             case DOCKER_WOLFI:
+            case DOCKER_FIPS:
                 // nothing, "installing" docker image is running it
                 break;
             default:
@@ -369,7 +378,7 @@ public abstract class PackagingTestCase extends Assert {
         switch (distribution.packaging) {
             case TAR, ZIP -> Archives.assertElasticsearchStarted(installation);
             case DEB, RPM -> Packages.assertElasticsearchStarted(sh, installation);
-            case DOCKER, DOCKER_IRON_BANK, DOCKER_CLOUD_ESS, DOCKER_WOLFI -> Docker.waitForElasticsearchToStart();
+            case DOCKER, DOCKER_IRON_BANK, DOCKER_CLOUD_ESS, DOCKER_WOLFI, DOCKER_FIPS -> Docker.waitForElasticsearchToStart();
             default -> throw new IllegalStateException("Unknown Elasticsearch packaging type.");
         }
     }
@@ -618,9 +627,9 @@ public abstract class PackagingTestCase extends Assert {
     /**
      * Validates that the installation {@code es} has been auto-configured. This applies to archives and docker only,
      * packages have nuances that justify their own version.
-     * @param es the {@link Installation} to check
+     * @param es the {@link DefaultInstallation} to check
      */
-    public void verifySecurityAutoConfigured(Installation es) throws Exception {
+    public void verifySecurityAutoConfigured(DefaultInstallation es) throws Exception {
         final String autoConfigDirName = "certs";
         final Settings settings;
         if (es.distribution.isArchive()) {
@@ -672,9 +681,9 @@ public abstract class PackagingTestCase extends Assert {
     /**
      * Validates that the installation {@code es} has not been auto-configured. This applies to archives and docker only,
      * packages have nuances that justify their own version.
-     * @param es the {@link Installation} to check
+     * @param es the {@link DefaultInstallation} to check
      */
-    public static void verifySecurityNotAutoConfigured(Installation es) throws Exception {
+    public static void verifySecurityNotAutoConfigured(DefaultInstallation es) throws Exception {
         assertThat(Files.exists(es.config("certs")), Matchers.is(false));
         if (es.distribution.isPackage()) {
             if (Files.exists(es.config("elasticsearch.keystore"))) {

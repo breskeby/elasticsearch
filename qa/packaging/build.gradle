@@ -29,6 +29,11 @@ dependencies {
   testImplementation "com.fasterxml.jackson.core:jackson-annotations:${versions.jackson}"
   testImplementation "com.fasterxml.jackson.core:jackson-core:${versions.jackson}"
   testImplementation "com.fasterxml.jackson.core:jackson-databind:${versions.jackson}"
+  testImplementation project(':test:fixtures:testcontainer-utils')
+  testImplementation("org.testcontainers:testcontainers:${versions.testcontainer}") {
+    transitive = false
+  }
+  testImplementation("org.slf4j:slf4j-api:$versions.slf4j")
 }
 
 // we don't have additional tests for the tests themselves

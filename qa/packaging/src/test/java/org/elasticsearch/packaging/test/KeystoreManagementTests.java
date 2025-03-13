@@ -11,7 +11,7 @@ package org.elasticsearch.packaging.test;
 
 import org.elasticsearch.packaging.util.Distribution;
 import org.elasticsearch.packaging.util.FileUtils;
-import org.elasticsearch.packaging.util.Installation;
+import org.elasticsearch.packaging.util.DefaultInstallation;
 import org.elasticsearch.packaging.util.Packages;
 import org.elasticsearch.packaging.util.Platforms;
 import org.elasticsearch.packaging.util.ServerUtils;
@@ -71,7 +71,7 @@ public class KeystoreManagementTests extends PackagingTestCase {
         // TODO: Possibly capture autoconfigured password from running the node the first time
         setFileSuperuser(FILE_REALM_SUPERUSER, FILE_REALM_SUPERUSER_PASSWORD);
 
-        final Installation.Executables bin = installation.executables();
+        final DefaultInstallation.Executables bin = installation.executables();
         Shell.Result r = sh.runIgnoreExitCode(bin.keystoreTool + " has-passwd");
         assertFalse("has-passwd should fail", r.isSuccess());
         assertThat("has-passwd should indicate missing keystore", r.stderr(), containsString(ERROR_KEYSTORE_NOT_FOUND));
@@ -87,7 +87,7 @@ public class KeystoreManagementTests extends PackagingTestCase {
         verifyPackageInstallation(installation, distribution, sh);
         setFileSuperuser(FILE_REALM_SUPERUSER, FILE_REALM_SUPERUSER_PASSWORD);
 
-        final Installation.Executables bin = installation.executables();
+        final DefaultInstallation.Executables bin = installation.executables();
         Shell.Result r = sh.runIgnoreExitCode(bin.keystoreTool + " has-passwd");
         assertFalse("has-passwd should fail", r.isSuccess());
         assertThat("has-passwd should indicate unprotected keystore", r.stderr(), containsString(ERROR_KEYSTORE_NOT_PASSWORD_PROTECTED));
@@ -107,7 +107,7 @@ public class KeystoreManagementTests extends PackagingTestCase {
             throw new RuntimeException(e);
         }
 
-        final Installation.Executables bin = installation.executables();
+        final DefaultInstallation.Executables bin = installation.executables();
         Shell.Result r = sh.runIgnoreExitCode(bin.keystoreTool + " has-passwd");
         assertFalse("has-passwd should fail", r.isSuccess());
         assertThat("has-passwd should indicate unprotected keystore", r.stdout(), containsString(ERROR_KEYSTORE_NOT_PASSWORD_PROTECTED));
@@ -302,7 +302,7 @@ public class KeystoreManagementTests extends PackagingTestCase {
         rmKeystoreIfExists();
         createKeystore(null);
 
-        final Installation.Executables bin = installation.executables();
+        final DefaultInstallation.Executables bin = installation.executables();
         verifyKeystorePermissions();
 
         Shell.Result r = bin.keystoreTool.run("list");
@@ -324,7 +324,7 @@ public class KeystoreManagementTests extends PackagingTestCase {
 
         verifyKeystorePermissions();
 
-        final Installation.Executables bin = installation.executables();
+        final DefaultInstallation.Executables bin = installation.executables();
         Shell.Result r = bin.keystoreTool.run("list");
         assertThat(r.stdout(), containsString("keystore.seed"));
     }
@@ -375,7 +375,7 @@ public class KeystoreManagementTests extends PackagingTestCase {
     /** Create a keystore. Provide a password to password-protect it, otherwise use null */
     private void createKeystore(String password) throws Exception {
         Path keystore = installation.config("elasticsearch.keystore");
-        final Installation.Executables bin = installation.executables();
+        final DefaultInstallation.Executables bin = installation.executables();
         bin.keystoreTool.run("create");
 
         if (distribution().isDocker()) {
@@ -416,7 +416,7 @@ public class KeystoreManagementTests extends PackagingTestCase {
     }
 
     private void setKeystorePassword(String password) throws Exception {
-        final Installation.Executables bin = installation.executables();
+        final DefaultInstallation.Executables bin = installation.executables();
 
         // set the password by passing it to stdin twice
         Platforms.onLinux(() -> bin.keystoreTool.run("passwd", password + "\n" + password + "\n"));
@@ -436,7 +436,7 @@ public class KeystoreManagementTests extends PackagingTestCase {
         switch (distribution.packaging) {
             case TAR, ZIP -> assertThat(keystore, file(File, ARCHIVE_OWNER, ARCHIVE_OWNER, p660));
             case DEB, RPM -> assertThat(keystore, file(File, "root", "elasticsearch", p660));
-            case DOCKER, DOCKER_IRON_BANK, DOCKER_CLOUD_ESS, DOCKER_WOLFI -> assertThat(keystore, DockerFileMatcher.file(p660));
+            case DOCKER, DOCKER_IRON_BANK, DOCKER_CLOUD_ESS, DOCKER_WOLFI, DOCKER_FIPS -> assertThat(keystore, DockerFileMatcher.file(p660));
             default -> throw new IllegalStateException("Unknown Elasticsearch packaging type.");
         }
     }

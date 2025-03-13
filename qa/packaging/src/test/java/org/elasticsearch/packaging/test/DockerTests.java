@@ -14,7 +14,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import org.apache.http.client.fluent.Request;
-import org.elasticsearch.packaging.util.Installation;
+import org.elasticsearch.packaging.util.DefaultInstallation;
 import org.elasticsearch.packaging.util.Platforms;
 import org.elasticsearch.packaging.util.ProcessInfo;
 import org.elasticsearch.packaging.util.ServerUtils;
@@ -23,13 +23,17 @@ import org.elasticsearch.packaging.util.Shell.Result;
 import org.elasticsearch.packaging.util.docker.DockerRun;
 import org.elasticsearch.packaging.util.docker.DockerShell;
 import org.elasticsearch.packaging.util.docker.MockServer;
+import org.elasticsearch.test.fixtures.testcontainers.TestContainersThreadFilter;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.BeforeClass;
 
 import java.io.IOException;
+import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
+import java.nio.file.attribute.UserPrincipal;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
@@ -100,9 +104,10 @@ import static org.junit.Assume.assumeTrue;
  *     <li>Another UBI image for Iron Bank</li>
  *     <li>A WOLFI-based image</li>
  *     <li>Image for Cloud</li>
+ *     <li>Image for FIPS</li>
  * </ul>
  */
-@ThreadLeakFilters(defaultFilters = true, filters = { HttpClientThreadsFilter.class })
+@ThreadLeakFilters(defaultFilters = true, filters = { HttpClientThreadsFilter.class, TestContainersThreadFilter.class })
 public class DockerTests extends PackagingTestCase {
     private Path tempDir;
     private static final String PASSWORD = "nothunter2";
@@ -117,8 +122,49 @@ public class DockerTests extends PackagingTestCase {
 
     @Before
     public void setupTest() throws IOException {
-        installation = runContainer(distribution(), builder().envVar("ELASTIC_PASSWORD", PASSWORD));
         tempDir = createTempDir(DockerTests.class.getSimpleName());
+        if (distribution.packaging == Packaging.DOCKER_FIPS) {
+//            Path config = tempDir.resolve("config");
+//            config.toFile().mkdirs();
+//            var fipsResources = List.of(
+//                "ca.crt",
+//                "ca.key",
+//                "elasticsearch.yml",
+//                "elasticsearch.keystore",
+//                "localhost.crt",
+//                "localhost.key",
+//                "node1.crt",
+//                "node1.key",
+//                "users",
+//                "users_roles"
+//            );
+//            copyFipsConfig(config, fipsResources);
+            DockerRun builder = builder().envVar("KEYSTORE_PASSWORD", "abcdefghijklmn");
+//            fipsResources.forEach(resource -> builder.volume(config.resolve(resource), "/usr/share/elasticsearch/config/" + resource));
+            installation = runContainer(distribution(), builder);
+        } else {
+            installation = runContainer(distribution(), builder().envVar("ELASTIC_PASSWORD", PASSWORD));
+        }
+    }
+
+    private void copyFipsConfig(Path config, List<String> fipsResources) throws IOException {
+        Files.setPosixFilePermissions(config, fromString("rwxrwxrwx"));
+        fipsResources.forEach(fileName -> {
+            String resourcePath = "fips/" + fileName; // ca.crt"; // Path inside the JAR
+            try (InputStream is = getClass().getResourceAsStream(resourcePath)) {
+                if (is == null) {
+                    System.out.println("Resource not found: " + resourcePath);
+                    return;
+                }
+
+                Path targetFilePath = config.resolve(fileName);
+                Files.copy(is, targetFilePath, StandardCopyOption.REPLACE_EXISTING);
+                UserPrincipal owner = () -> "elasticsearch";
+            } catch (Exception e) {
+                System.out.println("Failed to copy the resource");
+                e.printStackTrace();
+            }
+        });
     }
 
     @After
@@ -170,7 +216,7 @@ public class DockerTests extends PackagingTestCase {
     public void test020PluginsListWithNoPlugins() {
         assumeTrue("Only applies to non-Cloud images", distribution().packaging != Packaging.DOCKER_CLOUD_ESS);
 
-        final Installation.Executables bin = installation.executables();
+        final DefaultInstallation.Executables bin = installation.executables();
         final Result r = sh.run(bin.pluginTool + " list");
 
         assertThat("Expected no plugins to be listed", r.stdout(), emptyString());
@@ -188,7 +234,7 @@ public class DockerTests extends PackagingTestCase {
         final String plugin = "analysis-icu";
         assertThat("Expected " + plugin + " to not be installed", listPlugins(), not(hasItems(plugin)));
 
-        final Installation.Executables bin = installation.executables();
+        final DefaultInstallation.Executables bin = installation.executables();
         sh.run(bin.pluginTool + " install file:///analysis-icu.zip");
 
         assertThat("Expected installed plugins to be listed", listPlugins(), equalTo(List.of("analysis-icu")));
@@ -201,7 +247,7 @@ public class DockerTests extends PackagingTestCase {
         assumeTrue("Only ESS images have a local archive", distribution().packaging == Packaging.DOCKER_CLOUD_ESS);
 
         final String plugin = "analysis-icu";
-        final Installation.Executables bin = installation.executables();
+        final DefaultInstallation.Executables bin = installation.executables();
 
         listPluginArchive().forEach(System.out::println);
         assertThat("Expected " + plugin + " to not be installed", listPlugins(), not(hasItems(plugin)));
@@ -385,12 +431,14 @@ public class DockerTests extends PackagingTestCase {
         if (distribution.packaging == Packaging.DOCKER || distribution.packaging == Packaging.DOCKER_IRON_BANK) {
             // In these images, the `cacerts` file ought to be a symlink here
             assertThat(path, equalTo("/etc/pki/ca-trust/extracted/java/cacerts"));
-        } else if (distribution.packaging == Packaging.DOCKER_WOLFI || distribution.packaging == Packaging.DOCKER_CLOUD_ESS) {
-            // In these images, the `cacerts` file ought to be a symlink here
-            assertThat(path, equalTo("/etc/ssl/certs/java/cacerts"));
-        } else {
-            fail("Unknown distribution: " + distribution.packaging);
-        }
+        } else if (distribution.packaging == Packaging.DOCKER_WOLFI
+            || distribution.packaging == Packaging.DOCKER_CLOUD_ESS
+            || distribution.packaging == Packaging.DOCKER_FIPS) {
+                // In these images, the `cacerts` file ought to be a symlink here
+                assertThat(path, equalTo("/etc/ssl/certs/java/cacerts"));
+            } else {
+                fail("Unknown distribution: " + distribution.packaging);
+            }
     }
 
     /**
@@ -768,7 +816,7 @@ public class DockerTests extends PackagingTestCase {
      * and if present then it can execute.
      */
     public void test090SecurityCliPackaging() {
-        final Installation.Executables bin = installation.executables();
+        final DefaultInstallation.Executables bin = installation.executables();
 
         final Path securityCli = installation.lib.resolve("tools").resolve("security-cli");
 
@@ -787,7 +835,7 @@ public class DockerTests extends PackagingTestCase {
      * Check that the elasticsearch-shard tool is shipped in the Docker image and is executable.
      */
     public void test091ElasticsearchShardCliPackaging() {
-        final Installation.Executables bin = installation.executables();
+        final DefaultInstallation.Executables bin = installation.executables();
 
         final Result result = sh.run(bin.shardTool + " -h");
         assertThat(result.stdout(), containsString("A CLI tool to remove corrupted parts of unrecoverable shards"));
@@ -797,7 +845,7 @@ public class DockerTests extends PackagingTestCase {
      * Check that the elasticsearch-node tool is shipped in the Docker image and is executable.
      */
     public void test092ElasticsearchNodeCliPackaging() {
-        final Installation.Executables bin = installation.executables();
+        final DefaultInstallation.Executables bin = installation.executables();
 
         final Result result = sh.run(bin.nodeTool + " -h");
         assertThat(
@@ -1213,7 +1261,7 @@ public class DockerTests extends PackagingTestCase {
     }
 
     private List<String> listPlugins() {
-        final Installation.Executables bin = installation.executables();
+        final DefaultInstallation.Executables bin = installation.executables();
         return sh.run(bin.pluginTool + " list").stdout().lines().collect(Collectors.toList());
     }
 
