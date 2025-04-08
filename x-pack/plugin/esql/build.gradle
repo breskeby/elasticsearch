@@ -87,7 +87,7 @@ interface Injected {
 }
 
 tasks.named("test").configure {
-  if (buildParams.ci == false) {
+  if (buildParams.ci == false && Boolean.getBoolean("tests.esql.docs.skip") == false) {
     systemProperty 'generateDocs', true
     def injected = project.objects.newInstance(Injected)
     doFirst {
