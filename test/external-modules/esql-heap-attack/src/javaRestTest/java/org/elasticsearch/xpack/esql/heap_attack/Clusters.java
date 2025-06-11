@@ -16,12 +16,16 @@ import org.elasticsearch.test.cluster.local.distribution.DistributionType;
 public class Clusters {
     static ElasticsearchCluster buildCluster() {
         var spec = ElasticsearchCluster.local()
-            .distribution(DistributionType.DEFAULT)
+            .distribution(DistributionType.INTEG_TEST)
+            .module("x-pack-esql-core")
+            .module("x-pack-esql")
+            .module("x-pack-autoscaling")
+            .module("x-pack-ilm")
             .nodes(2)
             .module("test-esql-heap-attack")
-            .setting("xpack.security.enabled", "false")
+//            .setting("xpack.security.enabled", "false")
             .setting("xpack.license.self_generated.type", "trial")
-            .setting("esql.query.allow_partial_results", "false")
+//            .setting("esql.query.allow_partial_results", "false")
             .jvmArg("-Xmx512m");
         String javaVersion = JvmInfo.jvmInfo().version();
         if (javaVersion.equals("20") || javaVersion.equals("21")) {

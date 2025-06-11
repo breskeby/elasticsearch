@@ -18,7 +18,15 @@ esplugin {
   classname ='org.elasticsearch.test.esql.heap_attack.HeapAttackPlugin'
 }
 
+dependencies {
+  clusterModules project(':x-pack:plugin:core')
+  clusterModules project(':x-pack:plugin:esql-core')
+  clusterModules project(':x-pack:plugin:esql')
+  clusterModules project(':x-pack:plugin:autoscaling')
+  clusterModules project(':x-pack:plugin:ilm')
+}
+
 tasks.named('javaRestTest') {
-  usesDefaultDistribution("to be triaged")
-  it.onlyIf("snapshot build") { buildParams.snapshotBuild }
+//  usesDefaultDistribution("to be triaged")
+//  it.onlyIf("snapshot build") { buildParams.snapshotBuild }
 }
