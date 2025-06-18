@@ -188,4 +188,8 @@ tasks.named("thirdPartyAudit").configure {
     'software.amazon.eventstream.Message',
     'software.amazon.eventstream.MessageDecoder'
   )
+
+  tasks.named('javaRestTest').configure {
+    usesDockerDistribution()
+  }
 }

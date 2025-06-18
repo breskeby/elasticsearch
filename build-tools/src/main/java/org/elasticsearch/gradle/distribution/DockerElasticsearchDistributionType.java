@@ -7,13 +7,13 @@
  * License v3.0 only", or the "Server Side Public License, v 1".
  */
 
-package org.elasticsearch.gradle.internal.distribution;
+package org.elasticsearch.gradle.distribution;
 
 import org.elasticsearch.gradle.ElasticsearchDistributionType;
 
 public class DockerElasticsearchDistributionType implements ElasticsearchDistributionType {
 
-    DockerElasticsearchDistributionType() {}
+    public DockerElasticsearchDistributionType() {}
 
     @Override
     public String getName() {

@@ -73,6 +73,7 @@ public class RestTestBasePlugin implements Plugin<Project> {
     private static final String TESTS_CLUSTER_MODULES_PATH_SYSPROP = "tests.cluster.modules.path";
     private static final String TESTS_CLUSTER_PLUGINS_PATH_SYSPROP = "tests.cluster.plugins.path";
     private static final String DEFAULT_REST_INTEG_TEST_DISTRO = "default_distro";
+    private static final String DOCKER_REST_INTEG_TEST_DISTRO = "docker_distro";
     private static final String INTEG_TEST_REST_INTEG_TEST_DISTRO = "integ_test_distro";
     private static final String MODULES_CONFIGURATION = "clusterModules";
     private static final String PLUGINS_CONFIGURATION = "clusterPlugins";
@@ -107,6 +108,12 @@ public class RestTestBasePlugin implements Plugin<Project> {
             INTEG_TEST_REST_INTEG_TEST_DISTRO,
             VersionProperties.getElasticsearch(),
             ElasticsearchDistributionTypes.INTEG_TEST_ZIP
+        );
+        ElasticsearchDistribution dockerDistro = createDistribution(
+            project,
+            DOCKER_REST_INTEG_TEST_DISTRO,
+            VersionProperties.getElasticsearch(),
+            ElasticsearchDistributionTypes.DOCKER_DEFAULT
         );
 
         // Create configures for module and plugin dependencies
@@ -210,6 +217,35 @@ public class RestTestBasePlugin implements Plugin<Project> {
                         DEFAULT_DISTRIBUTION_SYSPROP,
                         providerFactory.provider(() -> defaultDistro.getExtracted().getSingleFile().getPath())
                     );
+
+                    // If we are using the default distribution we need to register all module feature metadata
+                    task.getInputs().files(defaultDistroFeatureMetadataConfig).withPathSensitivity(PathSensitivity.NONE);
+                    nonInputSystemProperties.systemProperty(TESTS_FEATURES_METADATA_PATH, defaultDistroFeatureMetadataConfig::getAsPath);
+
+                    return null;
+                }
+
+                private static boolean reasonForUsageProvided(Object[] args) {
+                    return args.length == 1 && args[0] instanceof String && ((String) args[0]).isBlank() == false;
+                }
+            });
+
+            // Add `usesDefaultDistribution()` extension method to test tasks to indicate they require the default distro
+            task.getExtensions().getExtraProperties().set("usesDockerDistribution", new Closure<Void>(task) {
+                @Override
+                public Void call(Object... args) {
+                    if (reasonForUsageProvided(args) == false) {
+                        throw new IllegalArgumentException(
+                            "Reason for using `usesDockerDistribution` required.\nUse usesDockerDistribution(\"reason why default distro is required here\")."
+                        );
+                    }
+                    task.dependsOn(dockerDistro);
+                    registerDistributionInputs(task, dockerDistro);
+                    dockerDistro.getBuildDependencies();
+//                    nonInputSystemProperties.systemProperty(
+//                        DEFAULT_DISTRIBUTION_SYSPROP,
+//                        providerFactory.provider(() -> defaultDistro.getExtracted().getSingleFile().getPath())
+//                    );
 
                     // If we are using the default distribution we need to register all module feature metadata
                     task.getInputs().files(defaultDistroFeatureMetadataConfig).withPathSensitivity(PathSensitivity.NONE);

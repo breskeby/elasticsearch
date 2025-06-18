@@ -10,6 +10,7 @@
 package org.elasticsearch.gradle.internal.distribution;
 
 import org.elasticsearch.gradle.ElasticsearchDistributionType;
+import org.elasticsearch.gradle.distribution.DockerElasticsearchDistributionType;
 
 import java.util.List;
 

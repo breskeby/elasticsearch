@@ -19,8 +19,10 @@ import org.gradle.api.tasks.TaskDependency;
 
 import java.io.File;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.Locale;
+import java.util.Map;
 
 public class ElasticsearchDistribution implements Buildable, Iterable<File> {
 
@@ -188,8 +190,10 @@ public class ElasticsearchDistribution implements Buildable, Iterable<File> {
         return extracted;
     }
 
+
     @Override
     public TaskDependency getBuildDependencies() {
+        System.out.println("skippingDockerDistributionBuild for distribution [" + skippingDockerDistributionBuild() + "]");
         if (skippingDockerDistributionBuild()) {
             return task -> Collections.emptySet();
         } else {

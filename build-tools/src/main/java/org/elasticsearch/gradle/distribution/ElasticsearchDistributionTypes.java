@@ -14,4 +14,5 @@ import org.elasticsearch.gradle.ElasticsearchDistributionType;
 public class ElasticsearchDistributionTypes {
     public static final ElasticsearchDistributionType ARCHIVE = new ArchiveElasticsearchDistributionType();
     public static final ElasticsearchDistributionType INTEG_TEST_ZIP = new IntegTestZipElasticsearchDistributionType();
+    public static final ElasticsearchDistributionType DOCKER_DEFAULT = new DockerElasticsearchDistributionType();
 }
