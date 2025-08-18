@@ -27,7 +27,7 @@ public abstract class AbstractDocValuesForUtilBenchmark {
 
     public abstract void benchmark(int bitsPerValue, Blackhole bh) throws IOException;
 
-    public abstract void setupIteration(int bitsPerValue, final Supplier<long[]> arraySupplier) throws IOException;
+    public abstract void setupIteration(int bitsPerValue, Supplier<long[]> arraySupplier) throws IOException;
 
     public abstract void setupInvocation(int bitsPerValue) throws IOException;
 }

@@ -99,3 +99,11 @@ spotless {
     targetExclude 'src/main/generated/**/*.java'
   }
 }
+
+tasks.named('licenseHeaders').configure {
+  excludes << "org/elasticsearch/benchmark/tdigest/**/*"
+}
+
+tasks.named('forbiddenApisMain').configure {
+  enabled = false
+}
