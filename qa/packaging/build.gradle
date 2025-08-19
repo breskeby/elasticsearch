@@ -37,3 +37,7 @@ tasks.named("test").configure { enabled = false }
 tasks.register('destructivePackagingTest') {
   dependsOn 'destructiveDistroTest'
 }
+
+tasks.named('testTestingConventions').configure {
+  baseClass 'org.elasticsearch.packaging.test.PackagingTestCase'
+}

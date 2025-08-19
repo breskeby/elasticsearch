@@ -20,6 +20,7 @@ import org.elasticsearch.common.bytes.BytesReference;
 import org.elasticsearch.common.io.stream.BytesStreamOutput;
 import org.elasticsearch.common.xcontent.XContentHelper;
 import org.elasticsearch.core.Nullable;
+import org.elasticsearch.core.SuppressForbidden;
 import org.elasticsearch.rest.RestStatus;
 import org.elasticsearch.test.ESTestCase;
 import org.elasticsearch.xcontent.XContentType;
@@ -37,6 +38,7 @@ import java.util.Set;
 
 import static org.hamcrest.Matchers.aMapWithSize;
 
+@SuppressForbidden(reason = "Relying on com.sun.net.httpserver")
 public class Ec2ImdsHttpHandlerTests extends ESTestCase {
 
     private static final String SECURITY_CREDENTIALS_URI = "/latest/meta-data/iam/security-credentials/";

@@ -15,6 +15,7 @@ import org.apache.ftpserver.listener.Listener;
 import org.apache.ftpserver.listener.ListenerFactory;
 import org.apache.ftpserver.usermanager.impl.BaseUser;
 import org.elasticsearch.core.Nullable;
+import org.elasticsearch.core.SuppressForbidden;
 import org.elasticsearch.rest.RestStatus;
 import org.elasticsearch.test.ESTestCase;
 import org.elasticsearch.test.fixture.AbstractHttpFixture;
@@ -34,6 +35,7 @@ import java.util.Map;
  * This {@link URLFixture} exposes a filesystem directory over HTTP. It is used in repository-url
  * integration tests to expose a directory created by a regular FS repository.
  */
+@SuppressForbidden(reason = "TemporaryFolder junit rule only provides java.io.File api")
 public class URLFixture extends AbstractHttpFixture implements TestRule {
     private final TemporaryFolder temporaryFolder;
     private Path repositoryDir;

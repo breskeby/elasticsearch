@@ -27,6 +27,7 @@ import org.elasticsearch.common.time.DateUtils;
 import org.elasticsearch.common.xcontent.support.XContentMapValues;
 import org.elasticsearch.core.Booleans;
 import org.elasticsearch.core.CheckedFunction;
+import org.elasticsearch.core.SuppressForbidden;
 import org.elasticsearch.index.IndexSettings;
 import org.elasticsearch.index.IndexVersion;
 import org.elasticsearch.index.IndexVersions;
@@ -97,6 +98,7 @@ import static org.hamcrest.Matchers.startsWith;
  * version is started with the same data directories and then this is rerun
  * with {@code tests.is_old_cluster} set to {@code false}.
  */
+@SuppressForbidden(reason = "TemporaryFolder junit rule only provides java.io.File api")
 public class FullClusterRestartIT extends ParameterizedFullClusterRestartTestCase {
 
     private static TemporaryFolder repoDirectory = new TemporaryFolder();

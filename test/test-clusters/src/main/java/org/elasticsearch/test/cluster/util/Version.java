@@ -10,7 +10,6 @@ package org.elasticsearch.test.cluster.util;
 
 import java.io.IOException;
 import java.io.InputStream;
-import java.io.Serializable;
 import java.io.UncheckedIOException;
 import java.util.Objects;
 import java.util.Optional;
@@ -21,7 +20,7 @@ import java.util.regex.Pattern;
 /**
  * Encapsulates comparison and printing logic for an x.y.z version.
  */
-public class Version implements Comparable<Version>, Serializable {
+public class Version implements Comparable<Version> {
     public static final Version CURRENT;
     private static final Pattern pattern = Pattern.compile("(\\d+)\\.(\\d+)\\.(\\d+)(?:-(alpha\\d+|beta\\d+|rc\\d+|SNAPSHOT))?");
     private static final Pattern relaxedPattern = Pattern.compile(

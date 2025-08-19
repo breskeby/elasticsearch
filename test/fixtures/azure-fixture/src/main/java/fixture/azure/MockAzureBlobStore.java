@@ -38,7 +38,8 @@ public class MockAzureBlobStore {
     /**
      * Provide the means of triggering lease expiration
      *
-     * @param leaseExpiryPredicate A Predicate that takes an active lease ID and returns true when it should be expired, or null to never fail leases
+     * @param leaseExpiryPredicate A Predicate that takes an active lease ID and returns true
+     *                             when it should be expired, or null to never fail leases
      */
     public MockAzureBlobStore(LeaseExpiryPredicate leaseExpiryPredicate) {
         this.blobs = new ConcurrentHashMap<>();

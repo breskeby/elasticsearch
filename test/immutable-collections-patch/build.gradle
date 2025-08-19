@@ -46,4 +46,8 @@ generatePatch.configure {
   }
 }
 
-artifacts.add("patch", generatePatch);
+artifacts.add("patch", generatePatch)
+
+tasks.named("forbiddenApisMain").configure {
+  ignoreMissingClasses = true
+}

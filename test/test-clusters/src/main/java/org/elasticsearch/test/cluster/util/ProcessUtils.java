@@ -24,6 +24,7 @@ import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeoutException;
@@ -152,9 +153,9 @@ public final class ProcessUtils {
                 return processHandle.isAlive() == false;
             });
         } catch (ExecutionException e) {
-            LOGGER.info("Failure while waiting for process to exit: {}", processHandle.info(), e);
+            LOGGER.info(String.format(Locale.ROOT, "Failure while waiting for process to exit: %s", processHandle.info()), e);
         } catch (TimeoutException e) {
-            LOGGER.info("Timed out waiting for process to exit: {}", processHandle.info(), e);
+            LOGGER.info(String.format(Locale.ROOT, "Timed out waiting for process to exit: %s", processHandle.info()), e);
         }
     }
 

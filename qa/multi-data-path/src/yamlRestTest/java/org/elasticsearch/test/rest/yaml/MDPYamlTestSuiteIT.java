@@ -12,16 +12,20 @@ package org.elasticsearch.test.rest.yaml;
 import com.carrotsearch.randomizedtesting.annotations.Name;
 import com.carrotsearch.randomizedtesting.annotations.ParametersFactory;
 
+import org.elasticsearch.core.SuppressForbidden;
 import org.elasticsearch.test.cluster.ElasticsearchCluster;
 import org.junit.ClassRule;
+import org.junit.rules.TemporaryFolder;
 
-import java.io.IOException;
-import java.nio.file.Files;
-
+@SuppressForbidden(reason = "TemporaryFolder junit rule only provides java.io.File api")
 public class MDPYamlTestSuiteIT extends ESClientYamlSuiteTestCase {
 
+    private static TemporaryFolder sharedData = new TemporaryFolder();
+
     @ClassRule
-    public static ElasticsearchCluster cluster = ElasticsearchCluster.local().setting("path.shared_data", tempSharedDataPath()).build();
+    public static ElasticsearchCluster cluster = ElasticsearchCluster.local()
+        .setting("path.shared_data", sharedData.getRoot().getPath())
+        .build();
 
     public MDPYamlTestSuiteIT(@Name("yaml") ClientYamlTestCandidate testCandidate) {
         super(testCandidate);
@@ -37,11 +41,4 @@ public class MDPYamlTestSuiteIT extends ESClientYamlSuiteTestCase {
         return cluster.getHttpAddresses();
     }
 
-    private static String tempSharedDataPath() {
-        try {
-            return Files.createTempDirectory("shared_data").toString();
-        } catch (IOException e) {
-            throw new AssertionError(e);
-        }
-    }
 }

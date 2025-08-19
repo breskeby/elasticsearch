@@ -27,6 +27,7 @@ import org.junit.ClassRule;
 import java.io.IOException;
 import java.time.Instant;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.function.Supplier;
 
@@ -143,6 +144,7 @@ public class LogsIndexModeFullClusterRestartIT extends ParameterizedFullClusterR
                 for (int i = 0; i < randomIntBetween(10, 20); i++) {
                     sb.append(
                         String.format(
+                            Locale.ROOT,
                             BULK_INDEX_REQUEST,
                             DateFormatter.forPattern(FormatNames.DATE_TIME.getName()).format(Instant.now()),
                             randomFrom("foo", "bar"),
@@ -165,6 +167,7 @@ public class LogsIndexModeFullClusterRestartIT extends ParameterizedFullClusterR
                 for (int i = 0; i < randomIntBetween(10, 20); i++) {
                     sb.append(
                         String.format(
+                            Locale.ROOT,
                             BULK_INDEX_REQUEST,
                             DateFormatter.forPattern(FormatNames.DATE_TIME.getName()).format(Instant.now()),
                             randomFrom("foo", "bar"),

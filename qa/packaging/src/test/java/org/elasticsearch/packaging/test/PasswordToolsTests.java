@@ -19,6 +19,7 @@ import org.junit.Before;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.HashMap;
+import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.Callable;
 import java.util.regex.Matcher;
@@ -157,8 +158,11 @@ public class PasswordToolsTests extends PackagingTestCase {
                 if (e.getMessage() != null
                     && (e.getMessage().contains("401 Unauthorized") || e.getMessage().contains("Failed to authenticate user"))) {
                     logger.info(
-                        "Authentication failed (possibly due to UnavailableShardsException for the security index), retrying [{}].",
-                        retries,
+                        String.format(
+                            Locale.ROOT,
+                            "Authentication failed (possibly due to UnavailableShardsException for the security index), retrying [{}].",
+                            retries
+                        ),
                         e
                     );
                     if (failure == null) {

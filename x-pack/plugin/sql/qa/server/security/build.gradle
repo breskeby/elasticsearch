@@ -70,5 +70,8 @@ subprojects {
     nonInputProperties.systemProperty 'tests.audit.yesterday.logfile',
       clusterInfo.map { it.auditLogs.get(0).getParentFile().toString() + "/javaRestTest_audit-${new Date().format('yyyy-MM-dd')}-1.json.gz"}
   }
+}
 
+tasks.named('testTestingConventions').configure {
+  suffix 'IT'
 }

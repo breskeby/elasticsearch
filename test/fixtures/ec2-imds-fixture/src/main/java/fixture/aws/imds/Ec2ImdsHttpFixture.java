@@ -24,6 +24,7 @@ import java.security.AccessController;
 import java.security.PrivilegedAction;
 import java.util.Objects;
 
+@SuppressForbidden(reason = "Relying on com.sun.net.httpserver")
 public class Ec2ImdsHttpFixture extends ExternalResource {
 
     /**

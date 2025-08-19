@@ -40,6 +40,7 @@ import java.security.KeyStore;
 import java.security.cert.CertificateFactory;
 import java.security.cert.X509Certificate;
 import java.util.List;
+import java.util.Locale;
 import java.util.Objects;
 import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
@@ -155,11 +156,13 @@ public class ServerUtils {
             return executor.execute(request).returnResponse();
         } catch (Exception e) {
             logger.warn(
-                "Failed to execute request [{}] with username/password [{}/{}] and caCert [{}]",
+                String
+                    .format(Locale.ROOT,
+                "Failed to execute request [%s] with username/password [%s/%s] and caCert [%s]",
                 request.toString(),
                 username,
                 password,
-                caCert,
+                caCert),
                 e
             );
             throw e;

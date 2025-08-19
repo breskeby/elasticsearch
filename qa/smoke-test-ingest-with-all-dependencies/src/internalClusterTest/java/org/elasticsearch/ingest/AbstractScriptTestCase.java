@@ -18,7 +18,7 @@ import org.elasticsearch.script.ScriptService;
 import org.elasticsearch.script.ScriptType;
 import org.elasticsearch.script.TemplateScript;
 import org.elasticsearch.script.mustache.MustacheScriptEngine;
-import org.elasticsearch.test.ESTestCase;
+import org.elasticsearch.test.ESIntegTestCase;
 import org.junit.Before;
 
 import java.util.Collections;
@@ -26,7 +26,7 @@ import java.util.Map;
 
 import static org.elasticsearch.script.Script.DEFAULT_TEMPLATE_LANG;
 
-public abstract class AbstractScriptTestCase extends ESTestCase {
+public abstract class AbstractScriptTestCase extends ESIntegTestCase {
 
     protected ScriptService scriptService;
 

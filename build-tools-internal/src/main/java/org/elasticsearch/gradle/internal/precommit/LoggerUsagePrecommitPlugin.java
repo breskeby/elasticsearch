@@ -22,6 +22,7 @@ public class LoggerUsagePrecommitPlugin extends PrecommitPlugin {
     @Override
     public TaskProvider<? extends Task> createTask(Project project) {
         Configuration loggerUsageConfig = project.getConfigurations().create("loggerUsagePlugin");
+
         // this makes it easier to test by not requiring this project to be always available in our
         // test sample projects
         if (project.findProject(":test:logger-usage") != null) {

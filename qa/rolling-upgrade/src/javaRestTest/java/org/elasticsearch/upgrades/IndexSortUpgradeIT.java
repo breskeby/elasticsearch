@@ -15,6 +15,7 @@ import org.elasticsearch.client.Request;
 import org.elasticsearch.common.settings.Settings;
 
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 
 /**
@@ -45,7 +46,7 @@ public class IndexSortUpgradeIT extends AbstractRollingUpgradeTestCase {
                         .put("index.sort.field", config.fieldName())
                         .put("index.sort.order", "desc")
                         .build(),
-                    """
+                    String.format(Locale.ROOT, """
                         {
                             "properties": {
                                 "%s": {
@@ -53,7 +54,7 @@ public class IndexSortUpgradeIT extends AbstractRollingUpgradeTestCase {
                                 }
                             }
                         }
-                        """.formatted(config.fieldName(), config.fieldType())
+                        """, config.fieldName(), config.fieldType())
                 );
             }
         }
@@ -72,7 +73,7 @@ public class IndexSortUpgradeIT extends AbstractRollingUpgradeTestCase {
             assertOK(bulkResponse);
 
             var searchRequest = new Request("GET", "/" + config.indexName() + "/_search");
-            searchRequest.setJsonEntity("""
+            searchRequest.setJsonEntity(String.format(Locale.ROOT, """
                 {
                     "query": {
                         "match_all": {}
@@ -83,7 +84,7 @@ public class IndexSortUpgradeIT extends AbstractRollingUpgradeTestCase {
                         }
                     }
                 }
-                """.formatted(config.fieldName()));
+                """, config.fieldName()));
             var searchResponse = client().performRequest(searchRequest);
             assertOK(searchResponse);
             var responseBody = entityAsMap(searchResponse);

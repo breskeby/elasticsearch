@@ -16,6 +16,7 @@ import com.carrotsearch.randomizedtesting.annotations.Name;
 import org.elasticsearch.client.Request;
 import org.elasticsearch.client.RequestOptions;
 import org.elasticsearch.client.WarningsHandler;
+import org.elasticsearch.core.SuppressForbidden;
 import org.elasticsearch.core.UpdateForV10;
 import org.elasticsearch.test.cluster.ElasticsearchCluster;
 import org.elasticsearch.test.cluster.FeatureFlag;
@@ -37,6 +38,7 @@ import static org.elasticsearch.cluster.routing.allocation.allocator.BalancedSha
  * version is started with the same data directories and then this is rerun
  * with {@code tests.is_old_cluster} set to {@code false}.
  */
+@SuppressForbidden(reason = "TemporaryFolder junit rule only provides java.io.File api")
 public class FullClusterRestartArchivedSettingsIT extends ParameterizedFullClusterRestartTestCase {
 
     private static TemporaryFolder repoDirectory = new TemporaryFolder();
