@@ -40,35 +40,58 @@ class LazyFileOutputStream extends OutputStream {
 
     @Override
     public void write(int b) throws IOException {
-        ensureInitialized();
-        delegate.write(b);
+        synchronized (lock) {
+            ensureInitialized();
+            if (delegate == null) {
+                throw new IOException("Stream has been closed");
+            }
+            delegate.write(b);
+        }
     }
 
     @Override
     public void write(byte b[], int off, int len) throws IOException {
-        ensureInitialized();
-        delegate.write(b, off, len);
+        synchronized (lock) {
+            ensureInitialized();
+            if (delegate == null) {
+                throw new IOException("Stream has been closed");
+            }
+            delegate.write(b, off, len);
+        }
     }
 
     @Override
     public void write(byte b[]) throws IOException {
-        ensureInitialized();
-        delegate.write(b);
+        synchronized (lock) {
+            ensureInitialized();
+            if (delegate == null) {
+                throw new IOException("Stream has been closed");
+            }
+            delegate.write(b);
+        }
     }
 
     @Override
     public void close() throws IOException {
         synchronized (lock) {
             if (initialized && delegate != null) {
-                delegate.close();
+                try {
+                    delegate.flush();
+                    delegate.close();
+                } finally {
+                    delegate = null;
+                    initialized = false;
+                }
             }
         }
     }
 
     @Override
     public void flush() throws IOException {
-        if (initialized && delegate != null) {
-            delegate.flush();
+        synchronized (lock) {
+            if (initialized && delegate != null) {
+                delegate.flush();
+            }
         }
     }
 }

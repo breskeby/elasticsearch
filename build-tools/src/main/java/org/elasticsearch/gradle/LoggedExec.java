@@ -153,16 +153,18 @@ public abstract class LoggedExec extends DefaultTask implements FileSystemOperat
         if (getCaptureOutput().get() && getIndentingConsoleOutput().isPresent()) {
             throw new GradleException("Capturing output is not supported when indentingConsoleOutput is configured.");
         }
+
+        File spoolFile = null;
         Consumer<Logger> outputLogger;
-        OutputStream out;
+
         if (spoolOutput) {
-            File spoolFile = new File(projectLayout.getBuildDirectory().dir("buffered-output").get().getAsFile(), this.getName());
-            out = new LazyFileOutputStream(spoolFile);
+            spoolFile = new File(projectLayout.getBuildDirectory().dir("buffered-output").get().getAsFile(), this.getName());
+            final File finalSpoolFile = spoolFile;
             outputLogger = logger -> {
                 try {
                     // the file may not exist if the command never output anything
-                    if (Files.exists(spoolFile.toPath())) {
-                        try (var lines = Files.lines(spoolFile.toPath())) {
+                    if (Files.exists(finalSpoolFile.toPath())) {
+                        try (var lines = Files.lines(finalSpoolFile.toPath())) {
                             lines.forEach(logger::error);
                         }
                     }
@@ -171,51 +173,86 @@ public abstract class LoggedExec extends DefaultTask implements FileSystemOperat
                 }
             };
         } else {
-            out = new ByteArrayOutputStream();
-            outputLogger = getIndentingConsoleOutput().isPresent() ? logger -> {} : logger -> logger.error(byteStreamToString(out));
+            outputLogger = logger -> {}; // Will be set later for non-spooling case
         }
 
-        OutputStream finalOutputStream = getIndentingConsoleOutput().isPresent()
-            ? new IndentingOutputStream(System.out, getIndentingConsoleOutput().get())
-            : out;
-        ExecResult execResult = execOperations.exec(execSpec -> {
-            execSpec.setIgnoreExitValue(true);
-            execSpec.setStandardOutput(finalOutputStream);
-            execSpec.setErrorOutput(finalOutputStream);
-            execSpec.setExecutable(getExecutable().get());
-            execSpec.environment(getEnvironment().get());
-            execSpec.environment(getNonTrackedEnvironment().get());
-            if (getArgs().isPresent()) {
-                execSpec.setArgs(getArgs().get());
-            }
-            if (getWorkingDir().isPresent()) {
-                execSpec.setWorkingDir(getWorkingDir().get());
-            }
-            if (getStandardInput().isPresent()) {
-                execSpec.setStandardInput(new ByteArrayInputStream(getStandardInput().get().getBytes(StandardCharsets.UTF_8)));
-            }
-        });
-        int exitValue = execResult.getExitValue();
+        executeWithManagedStreams(spoolOutput, spoolFile, outputLogger);
+    }
 
-        if (exitValue == 0 && getCaptureOutput().get()) {
-            output = byteStreamToString(out);
-        }
-        if (getLogger().isInfoEnabled() == false) {
-            if (exitValue != 0) {
-                try {
-                    if (getIndentingConsoleOutput().isPresent() == false) {
-                        getLogger().error("Output for " + getExecutable().get() + ":");
-                    }
-                    outputLogger.accept(getLogger());
-                } catch (Exception e) {
-                    throw new GradleException("Failed to read exec output", e);
+    private void executeWithManagedStreams(boolean spoolOutput, File spoolFile, Consumer<Logger> outputLogger) {
+        OutputStream out = spoolOutput ? new LazyFileOutputStream(spoolFile) : new ByteArrayOutputStream();
+
+        try (OutputStream managedStream = out) {
+            OutputStream finalOutputStream = getIndentingConsoleOutput().isPresent()
+                ? new IndentingOutputStream(System.out, getIndentingConsoleOutput().get())
+                : managedStream;
+
+            ExecResult execResult = execOperations.exec(execSpec -> {
+                execSpec.setIgnoreExitValue(true);
+                execSpec.setStandardOutput(finalOutputStream);
+                execSpec.setErrorOutput(finalOutputStream);
+                execSpec.setExecutable(getExecutable().get());
+                execSpec.environment(getEnvironment().get());
+                execSpec.environment(getNonTrackedEnvironment().get());
+                if (getArgs().isPresent()) {
+                    execSpec.setArgs(getArgs().get());
                 }
-                throw new GradleException(
-                    String.format("Process '%s %s' finished with non-zero exit value %d", getExecutable().get(), getArgs().get(), exitValue)
-                );
-            }
-        }
+                if (getWorkingDir().isPresent()) {
+                    execSpec.setWorkingDir(getWorkingDir().get());
+                }
+                if (getStandardInput().isPresent()) {
+                    execSpec.setStandardInput(new ByteArrayInputStream(getStandardInput().get().getBytes(StandardCharsets.UTF_8)));
+                }
+            });
 
+            // Ensure all output is flushed before processing results
+            try {
+                finalOutputStream.flush();
+                if (finalOutputStream != managedStream) {
+                    managedStream.flush();
+                }
+            } catch (IOException e) {
+                LOGGER.warn("Failed to flush output streams", e);
+            }
+
+            int exitValue = execResult.getExitValue();
+
+            if (exitValue == 0 && getCaptureOutput().get()) {
+                output = byteStreamToString(managedStream);
+            }
+
+            if (getLogger().isInfoEnabled() == false) {
+                if (exitValue != 0) {
+                    handleFailedExecution(spoolOutput, managedStream, outputLogger);
+                    throw new GradleException(
+                        String.format(
+                            "Process '%s %s' finished with non-zero exit value %d",
+                            getExecutable().get(),
+                            getArgs().get(),
+                            exitValue
+                        )
+                    );
+                }
+            }
+        } catch (IOException e) {
+            throw new GradleException("Failed to manage output streams", e);
+        }
+    }
+
+    private void handleFailedExecution(boolean spoolOutput, OutputStream managedStream, Consumer<Logger> outputLogger) {
+        try {
+            if (getIndentingConsoleOutput().isPresent() == false) {
+                getLogger().error("Output for " + getExecutable().get() + ":");
+            }
+
+            if (spoolOutput) {
+                outputLogger.accept(getLogger());
+            } else {
+                getLogger().error(byteStreamToString(managedStream));
+            }
+        } catch (Exception e) {
+            throw new GradleException("Failed to read exec output", e);
+        }
     }
 
     private String byteStreamToString(OutputStream out) {
