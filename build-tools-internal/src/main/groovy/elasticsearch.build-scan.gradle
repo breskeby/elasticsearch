@@ -7,14 +7,12 @@
  * License v3.0 only", or the "Server Side Public License, v 1".
  */
 
-import java.lang.management.ManagementFactory;
-import java.time.LocalDateTime;
 
-import org.elasticsearch.gradle.Architecture
 import org.elasticsearch.gradle.OS
 
 import java.lang.management.ManagementFactory
 import java.time.LocalDateTime
+import org.elasticsearch.gradle.Architecture
 
 def taskNames = gradle.startParameter.taskNames.join(' ')
 
@@ -30,10 +28,10 @@ develocity {
     // Automatically publish scans from Elasticsearch CI
     if (onCI) {
       publishing.onlyIf { true }
-      if(server.isPresent() == false) {
+      if (server.isPresent() == false) {
         server = 'https://gradle-enterprise.elastic.co'
       }
-    } else if( server.isPresent() == false) {
+    } else if (server.isPresent() == false) {
       publishing.onlyIf { false }
     }
 
@@ -97,6 +95,15 @@ develocity {
           tag 'pull-request'
           link 'Source', "${prBaseUrl}/tree/${System.getenv('BUILDKITE_COMMIT')}"
           link 'Pull Request', "https://github.com/${repository}/pull/${prId}"
+        } else if (System.getenv('ELASTICSEARCH_PR_NUMBER')) {
+          // For tracking es-pr-check failures in the serverless repo caused by elasticsearch PRs
+          def esPr = System.getenv('ELASTICSEARCH_PR_NUMBER')
+          def esCommit = System.getenv('ELASTICSEARCH_SUBMODULE_COMMIT')
+          value 'Git Commit ID', esCommit
+          tag "pr/${esPr}"
+          tag 'pull-request'
+          link 'Source', "https://github.com/elastic/elasticsearch/pull/${esPr}/commits/${esCommit}"
+          link 'Pull Request', "https://github.com/elastic/elasticsearch/pull/${esPr}"
         } else {
           value 'Git Commit ID', gitRevision.get()
           link 'Source', "https://github.com/${repository}/tree/${gitRevision.get()}"
