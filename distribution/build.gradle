@@ -14,13 +14,13 @@ import org.elasticsearch.gradle.VersionProperties
 import org.elasticsearch.gradle.internal.ConcatFilesTask
 import org.elasticsearch.gradle.internal.DependenciesInfoPlugin
 import org.elasticsearch.gradle.internal.NoticeTask
-import org.elasticsearch.gradle.internal.test.HistoricalFeaturesMetadataPlugin
+import org.elasticsearch.gradle.internal.test.ClusterFeaturesMetadataPlugin
 import org.elasticsearch.gradle.transform.FilteringJarTransform
 
 import java.nio.file.Files
 import java.nio.file.Path
 
-import static org.elasticsearch.gradle.internal.toolchain.EarlyAccessCatalogJdkToolchainResolver.findLatestPreReleaseBuildNumber
+import static org.elasticsearch.gradle.internal.toolchain.EarlyAccessCatalogJdkToolchainResolver.findLatestPreReleaseBuild
 
 plugins {
   id 'base'
@@ -39,7 +39,7 @@ configurations {
   }
   featuresMetadata {
     attributes {
-      attribute(ArtifactTypeDefinition.ARTIFACT_TYPE_ATTRIBUTE, HistoricalFeaturesMetadataPlugin.FEATURES_METADATA_TYPE)
+      attribute(ArtifactTypeDefinition.ARTIFACT_TYPE_ATTRIBUTE, ClusterFeaturesMetadataPlugin.FEATURES_METADATA_TYPE)
     }
   }
 }
@@ -78,7 +78,7 @@ tasks.register("generateDependenciesReport", ConcatFilesTask) {
   String[] rhelUbiFields = [
     'Red Hat Universal Base Image minimal',
     '9',
-    'https://catalog.redhat.com/en/software/containers/ubi9/ubi-minimal/615bd9b4075b022acc111bf5',
+    'https://catalog.redhat.com/software/containers/ubi9-minimal/61832888c0d15aff4912fe0d',
     'Custom;https://www.redhat.com/licenses/EULA_Red_Hat_Universal_Base_Image_English_20190422.pdf',
     'https://oss-dependencies.elastic.co/red-hat-universal-base-image-minimal/9/ubi-minimal-9-source.tar.gz'
   ]
@@ -255,13 +255,9 @@ configure(subprojects.findAll { ['archives', 'packages'].contains(it.name) }) {
   apply plugin: 'elasticsearch.repositories'
 
   if (buildParams.runtimeJava.preRelease) {
-    Integer buildNumber = Integer.getInteger("runtime.java.build")
     String preReleaseType = buildParams.runtimeJava.preReleaseType
     def runtimeJavaMajorVersion = Integer.parseInt(buildParams.runtimeJavaVersion.get().getMajorVersion())
-    if (buildNumber == null) {
-      buildNumber = findLatestPreReleaseBuildNumber(runtimeJavaMajorVersion, preReleaseType);
-    }
-    String preReleaseVersionString = String.format("%d-%s+%d", runtimeJavaMajorVersion, preReleaseType, buildNumber);
+    String preReleaseVersionString = String.format("%d-%s+%d", runtimeJavaMajorVersion, preReleaseType, buildParams.runtimeJava.buildNumber)
 
     project.jdks {
       ['darwin', 'windows', 'linux'].each { platform ->
