@@ -1,0 +1,87 @@
+/*
+ * Copyright Elasticsearch B.V. and/or licensed to Elasticsearch B.V. under one
+ * or more contributor license agreements. Licensed under the Elastic License
+ * 2.0; you may not use this file except in compliance with the Elastic License
+ * 2.0.
+ */
+
+package org.elasticsearch.xpack.stateless.autoscaling.search;
+
+import org.elasticsearch.core.Nullable;
+
+import java.util.Collection;
+import java.util.concurrent.ConcurrentHashMap;
+
+/**
+ * Tracks replica scale-down recommendations per index, including the number of signals received and the
+ * highest replica count recommended across all signals.
+ * <p> Thread-safe for concurrent access as updateMaxReplicasRecommended is atomic.
+ */
+public class ReplicasScaleDownState {
+    private final ConcurrentHashMap<String, PerIndexState> scaleDownStateByIndex;
+
+    ReplicasScaleDownState() {
+        scaleDownStateByIndex = new ConcurrentHashMap<>();
+    }
+
+    /**
+     * Clear state for every index.
+     */
+    void clearState() {
+        scaleDownStateByIndex.clear();
+    }
+
+    /**
+     * Clear state for the given indices.
+     * @param indices the indices to clear.
+     */
+    void clearStateForIndices(Collection<String> indices) {
+        if (indices != null && indices.isEmpty() == false) {
+            scaleDownStateByIndex.entrySet().removeIf(e -> indices.contains(e.getKey()));
+        }
+    }
+
+    /**
+     * Clear state for all indices not given.
+     * @param indices the indices to keep.
+     */
+    void clearStateExceptForIndices(Collection<String> indices) {
+        if (indices == null || indices.isEmpty()) {
+            scaleDownStateByIndex.clear();
+        } else {
+            scaleDownStateByIndex.entrySet().removeIf(e -> indices.contains(e.getKey()) == false);
+        }
+    }
+
+    /**
+     * Get the current state for the given index.
+     * @param index the index
+     * @return the state for the given index, or null if no state exists
+     */
+    @Nullable
+    PerIndexState getState(String index) {
+        return scaleDownStateByIndex.get(index);
+    }
+
+    /**
+     * Update the max number of replicas to scale down to for the given index. Also increments the
+     * signal count for the given index.
+     * @param index the index
+     * @param replicasRecommended the recommended number of replicas
+     * @return the updated state for the given index
+     */
+    PerIndexState updateMaxReplicasRecommended(String index, int replicasRecommended) {
+        return scaleDownStateByIndex.compute(index, (k, existing) -> {
+            if (existing == null) {
+                return new PerIndexState(1, replicasRecommended);
+            }
+            return new PerIndexState(existing.signalCount() + 1, Math.max(existing.maxReplicasRecommended(), replicasRecommended));
+        });
+    }
+
+    boolean isEmpty() {
+        return scaleDownStateByIndex.isEmpty();
+    }
+
+    record PerIndexState(int signalCount, int maxReplicasRecommended) {}
+}
