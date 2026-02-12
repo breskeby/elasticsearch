@@ -17,7 +17,7 @@ import java.util.zip.ZipFile
 
 class EmbeddedProviderPluginFuncTest extends AbstractGradleFuncTest {
 
-    def "embedded provider fat jar does not include impl MANIFEST.MF"() {
+    def "embedded provider fat jar is cacheable as classpath input and does not include impl MANIFEST.MF"() {
         given:
         def implBuild = subProject(":impl")
         implBuild << """
@@ -45,6 +45,73 @@ class EmbeddedProviderPluginFuncTest extends AbstractGradleFuncTest {
             embeddedProviders {
               impl 'test', project(':impl')
             }
+
+            import org.gradle.api.DefaultTask
+            import org.gradle.api.file.ConfigurableFileCollection
+            import org.gradle.api.file.RegularFileProperty
+            import org.gradle.api.tasks.CacheableTask
+            import org.gradle.api.tasks.Classpath
+            import org.gradle.api.tasks.OutputFile
+            import org.gradle.api.tasks.TaskAction
+            import java.net.URL
+            import java.net.URLClassLoader
+
+            @CacheableTask
+            abstract class UseEmbeddedProvidersOnClasspath extends DefaultTask {
+              @Classpath
+              abstract ConfigurableFileCollection getClasspath()
+
+              @OutputFile
+              abstract RegularFileProperty getOutputFile()
+
+              @TaskAction
+              void executeTask() {
+                def urls = classpath.files.toList().sort { it.absolutePath }.collect { it.toURI().toURL() } as URL[]
+                def classpathFiles = classpath.files.toList().sort { it.absolutePath }
+                def resourceName = null
+                for (def f : classpathFiles) {
+                  java.util.zip.ZipFile zipFile = new java.util.zip.ZipFile(f)
+                  try {
+                    def entries = zipFile.entries()
+                    while (entries.hasMoreElements()) {
+                      def entry = entries.nextElement()
+                      def name = entry.getName()
+                      if (name.startsWith("IMPL-JARS/test/") && name.endsWith("org/acme/Impl.class")) {
+                        resourceName = name
+                        break
+                      }
+                    }
+                  } finally {
+                    zipFile.close()
+                  }
+                  if (resourceName != null) {
+                    break
+                  }
+                }
+
+                assert resourceName != null : "Expected embedded impl class resource to exist on the jar classpath"
+
+                def digestBytes
+                URLClassLoader loader = new URLClassLoader(urls, (ClassLoader) null)
+                try {
+                  def stream = loader.getResourceAsStream(resourceName)
+                  assert stream != null : "Expected embedded impl class resource to exist on the jar classpath"
+                  stream.withCloseable {
+                    digestBytes = java.security.MessageDigest.getInstance("SHA-256").digest(it.bytes)
+                  }
+                } finally {
+                  loader.close()
+                }
+                assert digestBytes != null : "Expected embedded impl class resource to exist on the jar classpath"
+                outputFile.get().asFile.text = digestBytes.encodeHex().toString()
+              }
+            }
+
+            tasks.register("useEmbeddedProvidersOnClasspath", UseEmbeddedProvidersOnClasspath) {
+              dependsOn(tasks.named("jar"))
+              classpath.from(tasks.named("jar").flatMap { it.archiveFile })
+              outputFile.set(layout.buildDirectory.file("useEmbeddedProvidersOnClasspath/output.txt"))
+            }
         """
         file("src/main/java/org/acme/Main.java") << """
             package org.acme;
@@ -52,11 +119,16 @@ class EmbeddedProviderPluginFuncTest extends AbstractGradleFuncTest {
         """.stripIndent().stripTrailing()
 
         when:
-        def result = gradleRunner("jar", "-g", gradleUserHome).build()
+        def firstRun = gradleRunner("clean", "useEmbeddedProvidersOnClasspath", "--build-cache", "-g", gradleUserHome).build()
+        def secondRun = gradleRunner("clean", "useEmbeddedProvidersOnClasspath", "--build-cache", "-g", gradleUserHome).build()
 
         then:
-        result.task(":jar").outcome == TaskOutcome.SUCCESS
-        result.task(":generateImplProviderImpl")?.outcome in [TaskOutcome.SUCCESS, TaskOutcome.UP_TO_DATE]
+        firstRun.task(":useEmbeddedProvidersOnClasspath").outcome == TaskOutcome.SUCCESS
+        secondRun.task(":useEmbeddedProvidersOnClasspath").outcome == TaskOutcome.FROM_CACHE
+
+        and:
+        firstRun.task(":jar")?.outcome in [TaskOutcome.SUCCESS, TaskOutcome.FROM_CACHE]
+        firstRun.task(":generateImplProviderImpl")?.outcome in [TaskOutcome.SUCCESS, TaskOutcome.UP_TO_DATE, TaskOutcome.FROM_CACHE]
         file("build/libs/hello-world-1.0.jar").exists()
 
         and: "impl jar content is embedded but impl MANIFEST.MF is not"
