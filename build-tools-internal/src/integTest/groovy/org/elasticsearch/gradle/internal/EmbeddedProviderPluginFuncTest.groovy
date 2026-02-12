@@ -64,10 +64,14 @@ class EmbeddedProviderPluginFuncTest extends AbstractGradleFuncTest {
               @OutputFile
               abstract RegularFileProperty getOutputFile()
 
+              @OutputFile
+              abstract RegularFileProperty getJarPathFile()
+
               @TaskAction
               void executeTask() {
                 def urls = classpath.files.toList().sort { it.absolutePath }.collect { it.toURI().toURL() } as URL[]
                 def classpathFiles = classpath.files.toList().sort { it.absolutePath }
+                jarPathFile.get().asFile.text = classpathFiles*.absolutePath.join(System.lineSeparator()) + System.lineSeparator()
                 def resourceName = null
                 for (def f : classpathFiles) {
                   java.util.zip.ZipFile zipFile = new java.util.zip.ZipFile(f)
@@ -111,6 +115,7 @@ class EmbeddedProviderPluginFuncTest extends AbstractGradleFuncTest {
               dependsOn(tasks.named("jar"))
               classpath.from(tasks.named("jar").flatMap { it.archiveFile })
               outputFile.set(layout.buildDirectory.file("useEmbeddedProvidersOnClasspath/output.txt"))
+              jarPathFile.set(layout.buildDirectory.file("useEmbeddedProvidersOnClasspath/jar-path.txt"))
             }
         """
         file("src/main/java/org/acme/Main.java") << """
@@ -127,10 +132,12 @@ class EmbeddedProviderPluginFuncTest extends AbstractGradleFuncTest {
         and:
         firstRun.task(":jar")?.outcome in [TaskOutcome.SUCCESS, TaskOutcome.FROM_CACHE]
         firstRun.task(":generateImplProviderImpl")?.outcome in [TaskOutcome.SUCCESS, TaskOutcome.UP_TO_DATE, TaskOutcome.FROM_CACHE]
-        file("build/libs/hello-world-1.0.jar").exists()
+        String jarPath = file("build/useEmbeddedProvidersOnClasspath/jar-path.txt").readLines().find { it?.trim() }
+        assert jarPath != null : "Expected useEmbeddedProvidersOnClasspath to record jar path"
+        File jar = new File(jarPath.trim())
+        jar.exists()
 
         and: "impl jar content is embedded but impl MANIFEST.MF is not"
-        File jar = file("build/libs/hello-world-1.0.jar")
         boolean hasEmbeddedImplClass = false
         boolean hasEmbeddedImplManifest = false
 
