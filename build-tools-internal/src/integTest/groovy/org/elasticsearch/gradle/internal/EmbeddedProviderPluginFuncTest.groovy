@@ -17,12 +17,12 @@ import java.util.zip.ZipFile
 
 class EmbeddedProviderPluginFuncTest extends AbstractGradleFuncTest {
 
-    def "embedded provider fat jar is cacheable as classpath input and does not include impl MANIFEST.MF"() {
+    def "embedded provider fat jar is cacheable as classpath input"() {
         given:
         def implBuild = subProject(":impl")
         implBuild << """
             plugins {
-              id 'java'
+              id 'elasticsearch.java'
             }
             group = 'org.acme'
             version = '1.0'
@@ -36,7 +36,7 @@ class EmbeddedProviderPluginFuncTest extends AbstractGradleFuncTest {
 
         buildFile << """
             plugins {
-              id 'java'
+              id 'elasticsearch.java'
               id 'elasticsearch.embedded-providers'
             }
             group = 'org.acme'
