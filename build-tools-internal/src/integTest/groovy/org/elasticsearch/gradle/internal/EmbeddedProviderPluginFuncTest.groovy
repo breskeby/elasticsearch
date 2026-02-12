@@ -120,11 +120,9 @@ class EmbeddedProviderPluginFuncTest extends AbstractGradleFuncTest {
 
         when:
         def firstRun = gradleRunner("clean", "useEmbeddedProvidersOnClasspath", "--build-cache", "-g", gradleUserHome).build()
-        def secondRun = gradleRunner("clean", "useEmbeddedProvidersOnClasspath", "--build-cache", "-g", gradleUserHome).build()
 
         then:
         firstRun.task(":useEmbeddedProvidersOnClasspath").outcome == TaskOutcome.SUCCESS
-        secondRun.task(":useEmbeddedProvidersOnClasspath").outcome == TaskOutcome.FROM_CACHE
 
         and:
         firstRun.task(":jar")?.outcome in [TaskOutcome.SUCCESS, TaskOutcome.FROM_CACHE]
@@ -152,6 +150,12 @@ class EmbeddedProviderPluginFuncTest extends AbstractGradleFuncTest {
 
         assert hasEmbeddedImplClass : "Expected at least one embedded impl .class under IMPL-JARS/test/"
         assert hasEmbeddedImplManifest == false : "Did not expect IMPL-JARS/test/**/META-INF/MANIFEST.MF in output jar"
+
+        when:
+        def secondRun = gradleRunner("clean", "useEmbeddedProvidersOnClasspath", "--build-cache", "-g", gradleUserHome).build()
+
+        then:
+        secondRun.task(":useEmbeddedProvidersOnClasspath").outcome == TaskOutcome.FROM_CACHE
     }
 }
 
