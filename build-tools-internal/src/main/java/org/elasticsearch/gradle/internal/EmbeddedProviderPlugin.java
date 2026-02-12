@@ -15,7 +15,6 @@ import org.gradle.api.Project;
 import org.gradle.api.Task;
 import org.gradle.api.attributes.Attribute;
 import org.gradle.api.tasks.TaskProvider;
-import org.gradle.api.tasks.bundling.Jar;
 
 import static org.gradle.api.artifacts.type.ArtifactTypeDefinition.ARTIFACT_TYPE_ATTRIBUTE;
 import static org.gradle.api.artifacts.type.ArtifactTypeDefinition.DIRECTORY_TYPE;
@@ -35,13 +34,5 @@ public class EmbeddedProviderPlugin implements Plugin<Project> {
 
         TaskProvider<Task> metaTask = project.getTasks().register("generateProviderImpls");
         project.getExtensions().create("embeddedProviders", EmbeddedProviderExtension.class, project, metaTask);
-
-        // Gradle disables output caching for Jar tasks by default ("Not worth caching").
-        // Projects applying this plugin produce "fat" jars containing IMPL-JARS/, so caching is worthwhile.
-        project.getTasks().withType(Jar.class).configureEach(t -> {
-            if ("jar".equals(t.getName())) {
-                t.getOutputs().cacheIf("Embedded provider jars are worth caching", task -> true);
-            }
-        });
     }
 }

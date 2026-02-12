@@ -13,7 +13,6 @@ import org.elasticsearch.gradle.util.FileUtils;
 import org.gradle.api.DefaultTask;
 import org.gradle.api.file.ConfigurableFileCollection;
 import org.gradle.api.file.RegularFileProperty;
-import org.gradle.api.tasks.CacheableTask;
 import org.gradle.api.tasks.InputFiles;
 import org.gradle.api.tasks.OutputFile;
 import org.gradle.api.tasks.PathSensitive;
@@ -25,7 +24,6 @@ import java.util.stream.Collectors;
 
 import javax.inject.Inject;
 
-@CacheableTask
 abstract class GenerateProviderManifest extends DefaultTask {
 
     @Inject

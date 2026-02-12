@@ -55,14 +55,10 @@ public class EmbeddedProviderExtension {
         });
         var generateProviderImpl = project.getTasks().register(implTaskName, Sync.class);
         generateProviderImpl.configure(t -> {
-            // Gradle disables output caching for Sync tasks by default ("Not worth caching").
-            // These outputs are packaged into published jars, so caching is worthwhile here.
-            t.getOutputs().cacheIf("Embedded provider impl content is packaged into jars", task -> true);
             t.into(generatedResourcesRoot.map(d -> d.dir(implTaskName)));
             t.into("IMPL-JARS/" + implName, spec -> {
                 spec.from(extractedImplConfig, fromSpec -> {
-                    // Exclude impl-jar MANIFEST.MF to avoid embedding non-reproducible metadata into the "fat" output jar
-                    // and to keep task inputs stable for build cache key computation.
+                    // Exclude impl-jar MANIFEST.MF to avoid embedding non-reproducible metadata into the "fat" output jar.
                     fromSpec.exclude("**/META-INF/MANIFEST.MF");
                 });
                 spec.from(generateProviderManifest);
