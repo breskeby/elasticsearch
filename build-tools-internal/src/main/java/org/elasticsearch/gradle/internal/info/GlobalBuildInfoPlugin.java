@@ -217,6 +217,27 @@ public class GlobalBuildInfoPlugin implements Plugin<Project> {
         String branchesFileLocation = project.getProviders()
             .gradleProperty(BRANCHES_FILE_LOCATION_PROPERTY)
             .getOrElse(DEFAULT_BRANCHES_FILE_URL);
+        if (project.getGradle().getStartParameter().isOffline() && branchesFileLocation.startsWith("http")) {
+            File localBranchesFile = new File(Util.locateElasticsearchWorkspace(project.getGradle()), "branches.json");
+            if (localBranchesFile.exists()) {
+                LOGGER.warn(
+                    "Gradle is running in offline mode; cannot download branches.json from [{}]. Falling back to local branches.json at [{}].",
+                    branchesFileLocation,
+                    localBranchesFile.getAbsolutePath()
+                );
+                branchesFileLocation = localBranchesFile.getAbsolutePath();
+            } else {
+                throw new GradleException(
+                    "Gradle is running in offline mode and branches.json location is remote ["
+                        + branchesFileLocation
+                        + "], but no local branches.json exists at ["
+                        + localBranchesFile.getAbsolutePath()
+                        + "]. Configure a local file via ["
+                        + BRANCHES_FILE_LOCATION_PROPERTY
+                        + "] or disable offline mode."
+                );
+            }
+        }
         LOGGER.info("Reading branches.json from {}", branchesFileLocation);
         byte[] branchesBytes;
         if (branchesFileLocation.startsWith("http")) {
