@@ -1143,12 +1143,12 @@ public class ElasticsearchNode implements TestClusterConfiguration {
         boolean foundLeaks = false;
         for (String logLine : errorsAndWarnings.keySet()) {
             if (logLine.contains("ResourceLeakDetector") || logLine.contains("LeakTracker")) {
-                tailLogs = true;
                 foundLeaks = true;
                 break;
             }
         }
-        if (tailLogs) {
+        boolean emitTail = tailLogs || foundLeaks;
+        if (emitTail) {
             if (errorsAndWarnings.isEmpty() == false || ring.isEmpty() == false) {
                 LOGGER.lifecycle("\n=== {} `{}` ===", description, this);
             }
@@ -1174,7 +1174,7 @@ public class ElasticsearchNode implements TestClusterConfiguration {
             }
         }
         if (foundLeaks) {
-            leakMessage = "Found resource leaks in node log: " + from;
+            leakMessage = "Found resource leaks in node `" + this + "` log: " + from;
         }
     }
 

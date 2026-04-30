@@ -86,7 +86,7 @@ if [[ -n "$BUILD_JSON" ]]; then
           --header 'content-type: application/json' 2>/dev/null > "$PERF_RESPONSE_FILE" &
         PERF_PID=$!
 
-        FAILURES_RESPONSE_FILE=$(mktemp .failures-response.XXXXXX)
+        FAILURES_RESPONSE_FILE=$(umask 077 && mktemp .failures-response.XXXXXX)
         curl --compressed --request GET \
           --url "$DEVELOCITY_FAILURES_API_URL" \
           --max-filesize 10485760 \

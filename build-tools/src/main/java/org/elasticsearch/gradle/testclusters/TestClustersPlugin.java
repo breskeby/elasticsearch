@@ -48,7 +48,9 @@ import java.io.File;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.function.Function;
+import java.util.stream.Collectors;
 
 import javax.inject.Inject;
 
@@ -303,7 +305,23 @@ public class TestClustersPlugin implements Plugin<Project> {
                     // fails (test failure or doLast leak exception), doLast may not have run or may
                     // have only partially completed, so onFinish ensures clusters are cleaned up.
                     if (task.getDidWork() && taskFinishEvent.getResult() instanceof TaskFailureResult) {
-                        task.getClusters().forEach(cluster -> getParameters().getRegistry().get().stopCluster(cluster, true));
+                        TestClustersRegistry registry = getParameters().getRegistry().get();
+                        // Snapshot leaks already attributed (e.g. by a doLast leak throw) so we can
+                        // distinguish leaks newly surfaced by this failure-path stop from ones that
+                        // were already raised. Only the new ones should escalate from here.
+                        Set<String> existingLeaks = task.getClusters()
+                            .stream()
+                            .flatMap(cluster -> cluster.getLeakMessages().stream())
+                            .collect(Collectors.toSet());
+                        task.getClusters().forEach(cluster -> registry.stopCluster(cluster, true));
+                        List<String> newLeaks = task.getClusters()
+                            .stream()
+                            .flatMap(cluster -> cluster.getLeakMessages().stream())
+                            .filter(msg -> existingLeaks.contains(msg) == false)
+                            .toList();
+                        if (newLeaks.isEmpty() == false) {
+                            throw new TestClustersException(String.join("\n", newLeaks));
+                        }
                     }
                 }
             }

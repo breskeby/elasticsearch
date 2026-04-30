@@ -73,7 +73,9 @@ public abstract class TestClustersRegistry implements BuildService<BuildServiceP
                         return;
                     }
                 }
-            } else {
+            } else if (runningClusters.contains(cluster)) {
+                // Skip if doLast on the success path already stopped this cluster — re-stopping
+                // would re-tail logs and re-trigger leak detection on a process that's already gone.
                 cluster.stop(true);
                 runningClusters.remove(cluster);
             }

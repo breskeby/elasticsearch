@@ -21,9 +21,11 @@ REM   SMART_RETRY_STATUS        - enabled | disabled | failed
 REM   SMART_RETRY_DETAILS       - human-readable status detail
 REM   FILTERED_WORK_UNITS       - number of failed work units (if enabled)
 REM   EXECUTED_TASKS_COUNT      - number of executed test tasks (if available)
+REM   FAILED_TEST_TASKS_COUNT   - number of test tasks with non-test failures (if any)
 REM   Buildkite metadata keys:  smart-retry-status, smart-retry-details,
 REM                              origin-build-scan, smart-retry-work-units,
-REM                              smart-retry-executed-tasks
+REM                              smart-retry-executed-tasks, smart-retry-failed-tasks,
+REM                              smart-retry-disabled-reason
 REM =============================================================================
 
 echo --- [Smart Retry] Resolving previously failed tests
@@ -65,6 +67,7 @@ if exist .build-info.json (
             if not defined DEVELOCITY_BASE_URL set DEVELOCITY_BASE_URL=https://gradle-enterprise.elastic.co
             set DEVELOCITY_FAILED_TEST_API_URL=!DEVELOCITY_BASE_URL!/api/tests/build/!BUILD_SCAN_ID!?testOutcomes=failed
             set DEVELOCITY_TEST_PERF_API_URL=!DEVELOCITY_BASE_URL!/api/builds/!BUILD_SCAN_ID!/gradle-test-performance
+            set DEVELOCITY_FAILURES_API_URL=!DEVELOCITY_BASE_URL!/api/builds/!BUILD_SCAN_ID!/gradle-failures
 
             REM Add random delay to prevent API rate limiting (0-4 seconds)
             set /a "delay=%RANDOM% %% 5"
@@ -138,6 +141,63 @@ if exist .build-info.json (
                 echo [Smart Retry] Warning: Failed to fetch executed test tasks from Develocity API
                 echo [Smart Retry] Falling back to safe mode
               )
+
+              REM Fetch task-level failures (gradle-failures endpoint).
+              REM Provides failedTestTasks: test tasks that failed at the Gradle level
+              REM without individual test failures (e.g. resource leak detected after tests passed).
+              REM These tasks need a full re-run rather than being skipped as "confirmed passed".
+              set FAILED_TEST_TASKS_COUNT=0
+              curl --compressed --request GET --url "!DEVELOCITY_FAILURES_API_URL!" --max-filesize 10485760 --max-time 30 --retry 3 --retry-delay 2 --retry-max-time 60 --retry-connrefused --connect-timeout 10 --header "accept: application/json" --header "authorization: Bearer %DEVELOCITY_API_ACCESS_KEY%" --header "content-type: application/json" 2>nul > .failures-response.json.dl 2>nul
+
+              set FAILURES_DL_SIZE=0
+              if exist .failures-response.json.dl (
+                for %%A in (.failures-response.json.dl) do set FAILURES_DL_SIZE=%%~zA
+              )
+              if !FAILURES_DL_SIZE! GTR 0 (
+                move /y .failures-response.json.dl .failures-response.json >nul 2>&1
+              ) else (
+                del .failures-response.json.dl 2>nul
+              )
+
+              if exist .failures-response.json (
+                REM Cross-reference: keep only buildFailures whose taskPath is an executed test task.
+                REM When EXECUTED_TASK_PATHS is unavailable, take all buildFailure taskPaths — the
+                REM downstream plugin only consults this set per Test task, so non-test entries
+                REM (e.g. compileJava) are inert.
+                if defined EXECUTED_TASK_PATHS (
+                  if not "!EXECUTED_TASK_PATHS!"=="null" (
+                    for /f "delims=" %%i in ('jq -c --argjson testTasks "!EXECUTED_TASK_PATHS!" "($testTasks | map({(.): true}) | add // {}) as $lookup | [.buildFailures[] | .taskPath | select(. != null) | select($lookup[.])]" .failures-response.json 2^>nul') do set FAILED_TASK_PATHS=%%i
+                  ) else (
+                    for /f "delims=" %%i in ('jq -c "[.buildFailures[] | .taskPath | select(. != null)]" .failures-response.json 2^>nul') do set FAILED_TASK_PATHS=%%i
+                  )
+                ) else (
+                  for /f "delims=" %%i in ('jq -c "[.buildFailures[] | .taskPath | select(. != null)]" .failures-response.json 2^>nul') do set FAILED_TASK_PATHS=%%i
+                )
+                if defined FAILED_TASK_PATHS (
+                  if not "!FAILED_TASK_PATHS!"=="null" (
+                    if not "!FAILED_TASK_PATHS!"=="[]" (
+                      jq --argjson failed "!FAILED_TASK_PATHS!" ". + {failedTestTasks: $failed}" .failed-test-history.json > .failed-test-history.json.tmp 2>nul
+                      if exist .failed-test-history.json.tmp (
+                        for %%A in (.failed-test-history.json.tmp) do set FAILED_TMP_SIZE=%%~zA
+                        if !FAILED_TMP_SIZE! GTR 0 (
+                          move /y .failed-test-history.json.tmp .failed-test-history.json >nul 2>&1
+                          for /f "delims=" %%i in ('jq -r ".failedTestTasks | length" .failed-test-history.json 2^>nul') do set FAILED_TEST_TASKS_COUNT=%%i
+                          if not defined FAILED_TEST_TASKS_COUNT set FAILED_TEST_TASKS_COUNT=0
+                          echo [Smart Retry] Fetched !FAILED_TEST_TASKS_COUNT! failed tasks from previous run
+                        ) else (
+                          del .failed-test-history.json.tmp 2>nul
+                          echo [Smart Retry] Warning: jq produced empty output when merging failed test tasks
+                        )
+                      )
+                    )
+                  )
+                )
+                del .failures-response.json 2>nul
+              ) else (
+                echo [Smart Retry] Warning: Failed to fetch task failure data from Develocity API
+                echo [Smart Retry] Task-level failures (e.g. resource leaks) may not be targeted on retry
+              )
+
               REM Set restrictive file permissions (owner only)
               icacls .failed-test-history.json /inheritance:r /grant:r "%USERNAME%:(R,W)" >nul 2>&1
 
@@ -145,29 +205,44 @@ if exist .build-info.json (
               for /f "delims=" %%i in ('jq -r ".workUnits | length" .failed-test-history.json 2^>nul') do set FILTERED_WORK_UNITS=%%i
               if not defined FILTERED_WORK_UNITS set FILTERED_WORK_UNITS=0
 
-              set SMART_RETRY_STATUS=enabled
-              set SMART_RETRY_DETAILS=Filtering to !FILTERED_WORK_UNITS! work units with failures
+              REM If neither test failures nor task-level failures are present, the previous build
+              REM failed for an unrelated reason (e.g. infrastructure). Run everything.
+              REM Avoid goto out of () blocks (unreliable in cmd) — gate with a flag instead.
+              set SMART_RETRY_DISABLE=
+              if !FILTERED_WORK_UNITS! EQU 0 if !FAILED_TEST_TASKS_COUNT! EQU 0 set SMART_RETRY_DISABLE=1
 
-              REM Get the origin job name for better annotation labels
-              for /f "delims=" %%i in ('jq -r --arg jobId "!ORIGIN_JOB_ID!" ".jobs[] | select(.id == $jobId) | .name" .build-info.json 2^>nul') do set ORIGIN_JOB_NAME=%%i
-              if not defined ORIGIN_JOB_NAME set ORIGIN_JOB_NAME=previous attempt
-              if "!ORIGIN_JOB_NAME!"=="null" set ORIGIN_JOB_NAME=previous attempt
-
-              echo [Smart Retry] Enabled: filtering to !FILTERED_WORK_UNITS! work units
-
-              REM Create Buildkite annotation for visibility
-              echo Rerunning failed build job [!ORIGIN_JOB_NAME!]^(!BUILD_SCAN_URL!^) > .smart-retry-annotation.txt
-              echo. >> .smart-retry-annotation.txt
-              echo **Gradle Tasks with Failures:** !FILTERED_WORK_UNITS! >> .smart-retry-annotation.txt
-              if defined EXECUTED_TASKS_COUNT (
-                echo **Executed Test Tasks in Previous Run:** !EXECUTED_TASKS_COUNT! >> .smart-retry-annotation.txt
+              if defined SMART_RETRY_DISABLE (
+                del .failed-test-history.json 2>nul
+                set SMART_RETRY_STATUS=disabled
+                set SMART_RETRY_DETAILS=Previous failure was not caused by test or task failures - rerunning all tests
+                echo [Smart Retry] Disabled: previous build had no test or task failures
+                echo [Smart Retry] All tests will run.
               ) else (
-                echo **Executed Test Tasks in Previous Run:** unknown >> .smart-retry-annotation.txt
+                set SMART_RETRY_STATUS=enabled
+                set SMART_RETRY_DETAILS=Filtering to !FILTERED_WORK_UNITS! work units with test failures, !FAILED_TEST_TASKS_COUNT! tasks with non-test failures
+
+                REM Get the origin job name for better annotation labels
+                for /f "delims=" %%i in ('jq -r --arg jobId "!ORIGIN_JOB_ID!" ".jobs[] | select(.id == $jobId) | .name" .build-info.json 2^>nul') do set ORIGIN_JOB_NAME=%%i
+                if not defined ORIGIN_JOB_NAME set ORIGIN_JOB_NAME=previous attempt
+                if "!ORIGIN_JOB_NAME!"=="null" set ORIGIN_JOB_NAME=previous attempt
+
+                echo [Smart Retry] Enabled: !FILTERED_WORK_UNITS! work units with test failures, !FAILED_TEST_TASKS_COUNT! tasks with non-test failures
+
+                REM Create Buildkite annotation for visibility
+                echo Rerunning failed build job [!ORIGIN_JOB_NAME!]^(!BUILD_SCAN_URL!^) > .smart-retry-annotation.txt
+                echo. >> .smart-retry-annotation.txt
+                echo **Gradle Tasks with Test Failures:** !FILTERED_WORK_UNITS! >> .smart-retry-annotation.txt
+                echo **Gradle Tasks with Non-Test Failures:** !FAILED_TEST_TASKS_COUNT! >> .smart-retry-annotation.txt
+                if defined EXECUTED_TASKS_COUNT (
+                  echo **Executed Test Tasks in Previous Run:** !EXECUTED_TASKS_COUNT! >> .smart-retry-annotation.txt
+                ) else (
+                  echo **Executed Test Tasks in Previous Run:** unknown >> .smart-retry-annotation.txt
+                )
+                echo. >> .smart-retry-annotation.txt
+                echo This retry will rerun failed tests, rerun all tests for tasks that failed at the Gradle level (e.g. resource leaks), skip confirmed-passed tasks, and run all tests for tasks not executed in the previous run. >> .smart-retry-annotation.txt
+                buildkite-agent annotate --style info --context "smart-retry-!BUILDKITE_JOB_ID!" < .smart-retry-annotation.txt
+                del .smart-retry-annotation.txt 2>nul
               )
-              echo. >> .smart-retry-annotation.txt
-              echo This retry will rerun failed tests, skip confirmed-passed tasks, and run all tests for tasks that were not executed in the previous run. >> .smart-retry-annotation.txt
-              buildkite-agent annotate --style info --context "smart-retry-!BUILDKITE_JOB_ID!" < .smart-retry-annotation.txt
-              del .smart-retry-annotation.txt 2>nul
             ) else (
               echo [Smart Retry] API Error
               echo [Smart Retry] Failed to fetch failed tests from Develocity API
@@ -211,6 +286,8 @@ if exist .build-info.json (
   del .test-perf-response.json.dl 2>nul
   del .failed-test-history.json.tmp 2>nul
   del .failed-test-history.json.dl 2>nul
+  del .failures-response.json 2>nul
+  del .failures-response.json.dl 2>nul
 ) else (
   echo [Smart Retry] API Error
   echo [Smart Retry] Failed to fetch build information from Buildkite API
@@ -233,6 +310,14 @@ if defined FILTERED_WORK_UNITS (
 )
 if defined EXECUTED_TASKS_COUNT (
   buildkite-agent meta-data set "smart-retry-executed-tasks" "!EXECUTED_TASKS_COUNT!" 2>nul
+)
+if defined FAILED_TEST_TASKS_COUNT (
+  if !FAILED_TEST_TASKS_COUNT! GTR 0 (
+    buildkite-agent meta-data set "smart-retry-failed-tasks" "!FAILED_TEST_TASKS_COUNT!" 2>nul
+  )
+)
+if "!SMART_RETRY_STATUS!"=="disabled" (
+  buildkite-agent meta-data set "smart-retry-disabled-reason" "no-test-or-task-failures" 2>nul
 )
 
 exit /b 0
