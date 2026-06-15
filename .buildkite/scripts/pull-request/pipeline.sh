@@ -15,13 +15,13 @@ export BUILDKITE_RO_API_TOKEN
 DEVELOCITY_API_KEY=$(vault read -field=develocity_api_token secret/ci/elastic-elasticsearch/agentic-workflows)
 export DEVELOCITY_API_KEY
 
+PI_AGENT_GH_TOKEN=$(vault read -field=github_token secret/ci/elastic-elasticsearch/agentic-workflows)
+
 # ── bootstrap pi-agent (cached after first run on this agent) ─────────
 PI_AGENT_DIR="${HOME}/.local/pi-agent"
 if [[ ! -x "${PI_AGENT_DIR}/bin/pi-agent.js" ]]; then
-# Use the org-level admin token (broader repo access) to fetch the private release
-GH_ADMIN_TOKEN=$(cat "${GH_ADMIN_TOKEN_PATH}")
 PI_TARBALL_URL=$(curl -fsSL \
-    -H "Authorization: Bearer ${GH_ADMIN_TOKEN}" \
+    -H "Authorization: Bearer ${PI_AGENT_GH_TOKEN}" \
     "https://api.github.com/repos/elastic/rene-bk-experiments/releases" \
     | node -e "
         const rs = JSON.parse(require('fs').readFileSync('/dev/stdin','utf8'));
@@ -31,7 +31,7 @@ PI_TARBALL_URL=$(curl -fsSL \
     ")
 TMPDIR_DL="$(mktemp -d)"
 curl -fsSL \
-    -H "Authorization: Bearer ${GH_ADMIN_TOKEN}" \
+    -H "Authorization: Bearer ${PI_AGENT_GH_TOKEN}" \
     -H "Accept: application/octet-stream" \
     "${PI_TARBALL_URL}" -o "${TMPDIR_DL}/pi-agent.tgz"
 rm -rf "${PI_AGENT_DIR}" && mkdir -p "${PI_AGENT_DIR}"
