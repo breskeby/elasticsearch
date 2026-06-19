@@ -57,11 +57,15 @@ import org.jetbrains.annotations.NotNull;
 
 import java.io.File;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.UncheckedIOException;
 import java.lang.annotation.RetentionPolicy;
 import java.net.MalformedURLException;
 import java.net.URL;
 import java.net.URLClassLoader;
 import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.nio.file.StandardOpenOption;
 import java.util.ArrayList;
 import java.util.EnumSet;
@@ -100,6 +104,7 @@ public abstract class CheckForbiddenApisTask extends DefaultTask implements Patt
 
     private boolean ignoreFailures = false;
     private boolean ignoreMissingClasses = false;
+    private File foreignApiJar;
 
     @Input
     @Optional
@@ -216,7 +221,49 @@ public abstract class CheckForbiddenApisTask extends DefaultTask implements Patt
             resources.add(new File(resourcesDir, "forbidden/" + name + ".txt"));
         }
         setSignaturesFiles(objectFactory.fileCollection().from(getSignaturesFiles()).from(resources));
+    }
 
+    /**
+     * Opt-in to checking for direct usage of {@code java.lang.foreign} preview APIs that
+     * were renamed between JDK 21 and 22. Callers should use the adapter classes in
+     * {@code org.elasticsearch.foreign.adapter} instead.
+     *
+     * <p>This adds the {@code jdk-foreign-signatures} forbidden API signature file and
+     * configures a child-first classloader with the de-previewed foreign API stub JAR so
+     * that the forbidden-apis checker can resolve the JDK 21 preview method signatures.
+     */
+    public void checkForeignApiUsage() {
+        addSignatureFiles("jdk-foreign-signatures");
+        File buildDir = projectLayout.getBuildDirectory().getAsFile().get();
+        File jar = extractForeignApiJar(buildDir);
+        setForeignApiJar(jar);
+    }
+
+    private static File extractForeignApiJar(File buildDir) {
+        Path dest = buildDir.toPath().resolve("jdk21-foreign-api.jar");
+        if (Files.exists(dest)) {
+            return dest.toFile();
+        }
+        try (InputStream is = CheckForbiddenApisTask.class.getResourceAsStream("/jdk/jdk21-foreign-api.jar")) {
+            if (is == null) {
+                throw new IllegalStateException("jdk21-foreign-api.jar resource not found on build classpath");
+            }
+            Files.createDirectories(dest.getParent());
+            Path tmp = Files.createTempFile(dest.getParent(), "jdk21-foreign-api", ".jar.tmp");
+            try {
+                Files.copy(is, tmp, StandardCopyOption.REPLACE_EXISTING);
+                try {
+                    Files.move(tmp, dest, StandardCopyOption.ATOMIC_MOVE);
+                } catch (IOException ignored) {
+                    // another task won the race
+                }
+            } finally {
+                Files.deleteIfExists(tmp);
+            }
+        } catch (IOException e) {
+            throw new UncheckedIOException("Failed to extract jdk21-foreign-api.jar", e);
+        }
+        return dest.toFile();
     }
 
     /**
@@ -259,6 +306,23 @@ public abstract class CheckForbiddenApisTask extends DefaultTask implements Patt
 
     public void setIgnoreMissingClasses(boolean ignoreMissingClasses) {
         this.ignoreMissingClasses = ignoreMissingClasses;
+    }
+
+    /**
+     * Optional JAR containing de-previewed java.lang.foreign API stubs. When set,
+     * the forbidden-apis checker uses a child-first classloader so that the stub JAR
+     * shadows the runtime JDK's java.lang.foreign classes, allowing signature resolution
+     * of preview API methods that were renamed between JDK 21 and 22.
+     */
+    @InputFiles
+    @Optional
+    @PathSensitive(PathSensitivity.NONE)
+    public File getForeignApiJar() {
+        return foreignApiJar;
+    }
+
+    public void setForeignApiJar(File foreignApiJar) {
+        this.foreignApiJar = foreignApiJar;
     }
 
     /**
@@ -392,6 +456,9 @@ public abstract class CheckForbiddenApisTask extends DefaultTask implements Patt
             parameters.getIgnoreMissingClasses().set(getIgnoreMissingClasses());
             parameters.getSuccessMarker().set(getSuccessMarker());
             parameters.getSignaturesFiles().from(getSignaturesFiles());
+            if (foreignApiJar != null) {
+                parameters.getForeignApiJar().set(foreignApiJar);
+            }
         });
     }
 
@@ -520,7 +587,67 @@ public abstract class CheckForbiddenApisTask extends DefaultTask implements Patt
                 throw new InvalidUserDataException("Failed to build classpath URLs.", mfue);
             }
 
+            RegularFileProperty foreignApiJarProp = getParameters().getForeignApiJar();
+            if (foreignApiJarProp.isPresent()) {
+                try {
+                    File jarFile = foreignApiJarProp.getAsFile().get();
+                    URL foreignJarUrl = jarFile.toURI().toURL();
+                    return new ForeignFirstClassLoader(foreignJarUrl, urls, ClassLoader.getSystemClassLoader());
+                } catch (MalformedURLException mfue) {
+                    throw new InvalidUserDataException("Failed to build foreign API JAR URL.", mfue);
+                }
+            }
             return URLClassLoader.newInstance(urls, ClassLoader.getSystemClassLoader());
+        }
+
+        /**
+         * A classloader that checks its own URLs before delegating to the parent for
+         * classes and resources under {@code java/lang/foreign/}. This allows a
+         * de-previewed stub JAR to shadow the runtime JDK's preview API classes, so
+         * that forbidden-apis can resolve method signatures for JDK 21 preview APIs
+         * that were renamed in JDK 22.
+         *
+         * For all other classes, standard parent-first delegation applies.
+         */
+        private static class ForeignFirstClassLoader extends URLClassLoader {
+            private static final String FOREIGN_RESOURCE_PREFIX = "java/lang/foreign/";
+
+            ForeignFirstClassLoader(URL foreignJarUrl, URL[] classpathUrls, ClassLoader parent) {
+                super(prepend(foreignJarUrl, classpathUrls), parent);
+            }
+
+            private static URL[] prepend(URL first, URL[] rest) {
+                URL[] combined = new URL[rest.length + 1];
+                combined[0] = first;
+                System.arraycopy(rest, 0, combined, 1, rest.length);
+                return combined;
+            }
+
+            @Override
+            public URL getResource(String name) {
+                if (name.startsWith(FOREIGN_RESOURCE_PREFIX)) {
+                    URL url = findResource(name);
+                    if (url != null) {
+                        return url;
+                    }
+                }
+                return super.getResource(name);
+            }
+
+            @Override
+            public InputStream getResourceAsStream(String name) {
+                if (name.startsWith(FOREIGN_RESOURCE_PREFIX)) {
+                    URL url = findResource(name);
+                    if (url != null) {
+                        try {
+                            return url.openStream();
+                        } catch (IOException e) {
+                            return null;
+                        }
+                    }
+                }
+                return super.getResourceAsStream(name);
+            }
         }
 
         @NotNull
@@ -591,6 +718,7 @@ public abstract class CheckForbiddenApisTask extends DefaultTask implements Patt
 
         ListProperty<String> getSignatures();
 
+        RegularFileProperty getForeignApiJar();
     }
 
 }
