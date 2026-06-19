@@ -7,18 +7,9 @@
  * License v3.0 only", or the "Server Side Public License, v 1".
  */
 
-import org.elasticsearch.gradle.internal.precommit.CheckForbiddenApisTask
-
-apply plugin: 'elasticsearch.publish'
-apply plugin: 'elasticsearch.mrjar'
-
-dependencies {
-  api project(':libs:core')
-  api project(':libs:logging')
-  api project(':libs:foreign-adapter')
-}
-
-tasks.withType(CheckForbiddenApisTask).configureEach {
-  // :libs:foreign-library does not depend on server (and so not on lucene)
-  replaceSignatureFiles 'jdk-signatures'
+/**
+ * Adapts java.lang.foreign APIs that changed between JDK 21 and 22+.
+ */
+module org.elasticsearch.foreign.adapter {
+    exports org.elasticsearch.foreign.adapter;
 }

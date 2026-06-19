@@ -12,13 +12,6 @@ import org.elasticsearch.gradle.internal.precommit.CheckForbiddenApisTask
 apply plugin: 'elasticsearch.publish'
 apply plugin: 'elasticsearch.mrjar'
 
-dependencies {
-  api project(':libs:core')
-  api project(':libs:logging')
-  api project(':libs:foreign-adapter')
-}
-
 tasks.withType(CheckForbiddenApisTask).configureEach {
-  // :libs:foreign-library does not depend on server (and so not on lucene)
   replaceSignatureFiles 'jdk-signatures'
 }
