@@ -77,8 +77,6 @@ class BuildLogicTestCoverageArchUnitSpec extends AbstractArchUnitSpec {
      * first filing a follow-up to fix the underlying incompatibility.
      */
     private static final Set<String> KNOWN_CC_INCOMPATIBLE = [
-        "BuildPluginFuncTest",
-        "SnykDependencyMonitoringGradlePluginFuncTest",
     ] as Set
 
     private static final Set<String> KNOWN_UNCOVERED = [
