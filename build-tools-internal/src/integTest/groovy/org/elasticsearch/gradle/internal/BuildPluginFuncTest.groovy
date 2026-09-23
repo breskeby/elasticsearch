@@ -56,7 +56,11 @@ class BuildPluginFuncTest extends AbstractGradleInternalPluginFuncTest {
         THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.""".stripIndent()
 
     def setup() {
-        disableConfigurationCache("checkstyle task references LegacyConfiguration class; revisit after checkstyle update")
+        disableConfigurationCache(
+            "Gradle's built-in checkstyle plugin stores a DefaultLegacyConfiguration in the checkstyleClasspath field of" +
+                " the Checkstyle task, which is not configuration-cache serializable; the task stays on the graph even when" +
+                " disabled. This is a third-party (Gradle core) limitation, not ES build logic"
+        )
         // elasticsearch.build (BuildPlugin) and elasticsearch.global-build-info are applied by
         // AbstractGradleInternalPluginFuncTest; we only add the java plugin and project config here.
         buildFile << """

@@ -27,7 +27,11 @@ class SnykDependencyMonitoringGradlePluginFuncTest extends AbstractGradleInterna
     Class<? extends Plugin> pluginClassUnderTest = SnykDependencyMonitoringGradlePlugin.class
 
     def setup() {
-        disableConfigurationCache("SnykDependencyMonitoringGradlePlugin configuration is not cc compliant")
+        disableConfigurationCache(
+            "GenerateSnykDependencyGraph resolves the runtime classpath via Configuration.getResolvedConfiguration()" +
+                ".getFirstLevelModuleDependencies() at execution time; making this CC-safe requires migrating the task to a" +
+                " serializable ResolutionResult model, which is beyond a small local fix"
+        )
     }
 
     @Unroll
