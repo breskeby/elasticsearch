@@ -49,7 +49,6 @@ class EsqlDataSourceBwcPluginFuncTest extends AbstractGradleInternalPluginFuncTe
         buildFile << """
             import org.elasticsearch.gradle.testclusters.StandaloneRestIntegTestTask
 
-            ext.bwc_tests_enabled = true
             apply plugin: 'java'
             apply plugin: 'elasticsearch.internal-java-rest-test'
 
@@ -156,7 +155,6 @@ class EsqlDataSourceBwcPluginFuncTest extends AbstractGradleInternalPluginFuncTe
     def "rejects exclusions without owner and reason"() {
         given:
         buildFile << """
-            ext.bwc_tests_enabled = true
             apply plugin: 'java'
             apply plugin: 'elasticsearch.internal-java-rest-test'
 

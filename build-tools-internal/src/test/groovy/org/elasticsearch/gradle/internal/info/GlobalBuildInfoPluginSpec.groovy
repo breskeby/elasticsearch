@@ -121,6 +121,32 @@ class GlobalBuildInfoPluginSpec extends AbstractProjectBuilderPluginSpec {
         ex.message.contains("org.elasticsearch.build.branches-file-location")
     }
 
+    def "bwc tests are enabled by default"() {
+        when:
+        project.objects.newInstance(getPluginClassUnderTest()).apply(project)
+        BuildParameterExtension ext = project.extensions.getByType(BuildParameterExtension)
+
+        then:
+        ext.ciSplitBuild == false
+        ext.bwcTestsEnabled.get()
+    }
+
+    def "split CI tasks are exposed and disable bwc tests"() {
+        given:
+        project.getGradle().getStartParameter().setTaskNames([taskName])
+
+        when:
+        project.objects.newInstance(getPluginClassUnderTest()).apply(project)
+        BuildParameterExtension ext = project.extensions.getByType(BuildParameterExtension)
+
+        then:
+        ext.ciSplitBuild
+        ext.bwcTestsEnabled.get() == false
+
+        where:
+        taskName << ["checkPart4", "releaseTestCheckEsqlEngine", "functionalTests", "checkBuildLogic"]
+    }
+
     String branchesJson(List<DevelopmentBranch> branches) {
         Map<String, Object> branchesFileContent = [
             branches: branches.collect { branch ->

@@ -13,6 +13,7 @@ import org.elasticsearch.gradle.internal.BwcVersions;
 import org.gradle.api.Action;
 import org.gradle.api.JavaVersion;
 import org.gradle.api.Task;
+import org.gradle.api.provider.Property;
 import org.gradle.api.provider.Provider;
 import org.gradle.api.provider.ProviderFactory;
 import org.gradle.jvm.toolchain.JavaToolchainSpec;
@@ -43,6 +44,8 @@ public abstract class DefaultBuildParameterExtension implements BuildParameterEx
     private final Boolean isCi;
     private final Integer defaultParallel;
     private final Boolean snapshotBuild;
+    private final Boolean ciSplitBuild;
+    private final Property<Boolean> bwcTestsEnabled;
 
     // not final for testing
     private Provider<BwcVersions> bwcVersions;
@@ -63,6 +66,8 @@ public abstract class DefaultBuildParameterExtension implements BuildParameterEx
         boolean isCi,
         int defaultParallel,
         final boolean isSnapshotBuild,
+        boolean ciSplitBuild,
+        Property<Boolean> bwcTestsEnabled,
         Provider<BwcVersions> bwcVersions
     ) {
         this.inFipsJvm = providers.systemProperty("tests.fips.enabled").map(DefaultBuildParameterExtension::parseBoolean);
@@ -81,6 +86,8 @@ public abstract class DefaultBuildParameterExtension implements BuildParameterEx
         this.isCi = isCi;
         this.defaultParallel = defaultParallel;
         this.snapshotBuild = isSnapshotBuild;
+        this.ciSplitBuild = ciSplitBuild;
+        this.bwcTestsEnabled = bwcTestsEnabled;
         this.bwcVersions = cache(providers, bwcVersions);
         this.gitOrigin = gitOrigin;
     }
@@ -209,6 +216,23 @@ public abstract class DefaultBuildParameterExtension implements BuildParameterEx
     @Override
     public Boolean getSnapshotBuild() {
         return snapshotBuild;
+    }
+
+    @Override
+    public Boolean getCiSplitBuild() {
+        return ciSplitBuild;
+    }
+
+    @Override
+    public Property<Boolean> getBwcTestsEnabled() {
+        return bwcTestsEnabled;
+    }
+
+    @Override
+    public void onReleaseBuild(Action<? super BuildParameterExtension> action) {
+        if (snapshotBuild == false) {
+            action.execute(this);
+        }
     }
 
     @Override

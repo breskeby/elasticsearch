@@ -296,21 +296,14 @@ def upgradeCompatibilityZip = tasks.register("upgradeCompatibilityZip", Zip) {
   from(generateUpgradeCompatibilityFile)
 }
 
-def isCiSplitTask = { String taskName ->
-  taskName.startsWith("checkPart") || taskName.startsWith("releaseTestCheck")
-    || taskName == 'functionalTests' || taskName == 'checkBuildLogic'
-}
+def rootBuildParams = buildParams
 
-// TODO: This flag existed as a mechanism to disable bwc tests during a backport. It is no
-// longer used for that purpose, but instead a way to run only functional tests. We should
-// rework the functionalTests task to be more explicit about which tasks it wants to run
-// so that that this flag is no longer needed.
-boolean bwc_tests_enabled = true
-if (project.gradle.startParameter.taskNames.any(isCiSplitTask)) {
-  // Disable BWC tests for split CI tasks and platform support tests as it's expected that this will run on its own check.
-  bwc_tests_enabled = false
+// Temporary emergency/backport kill switch for BWC tests. Flip to true only when you need
+// to suppress BWC work in this branch on purpose, and revert the change before merging.
+boolean manuallyDisableBwcTests = false
+if (manuallyDisableBwcTests) {
+  rootBuildParams.bwcTestsEnabled.set(false)
 }
-
 
 allprojects {
   // We disable this plugin for now till we shaked out the issues we see
@@ -323,9 +316,6 @@ allprojects {
       testImplementation project(path: ":test:framework")
     }
   }
-
-  ext.bwc_tests_enabled = bwc_tests_enabled
-
 
   tasks.register('resolveAllDependencies', ResolveAllDependencies) {
     def ignoredPrefixes = [DistributionDownloadPlugin.ES_DISTRO_CONFIG_PREFIX, "jdbcDriver"]
@@ -356,16 +346,10 @@ allprojects {
 
   }
 
-  ext.withReleaseBuild = { Closure config ->
-    if (buildParams.snapshotBuild == false) {
-      config.call()
-    }
-  }
-
   def splitForCI = { proj, partString ->
     proj.tasks.register("check$partString") {
       dependsOn 'check'
-      withReleaseBuild {
+      rootBuildParams.onReleaseBuild {
         dependsOn 'assemble'
       }
     }
@@ -380,7 +364,7 @@ allprojects {
 
     proj.tasks.register("bcUpgradeTest$partString") {
       dependsOn tasks.matching { it.name == 'bcUpgradeTest' }
-      withReleaseBuild {
+      rootBuildParams.onReleaseBuild {
         dependsOn 'assemble'
       }
     }
@@ -415,7 +399,7 @@ allprojects {
     }
     tasks.register('functionalTests') {
       dependsOn 'check'
-      withReleaseBuild {
+      rootBuildParams.onReleaseBuild {
         dependsOn 'assemble'
       }
     }
@@ -484,7 +468,7 @@ tasks.named("updateDaemonJvm") {
 
 tasks.register("verifyBwcTestsEnabled") {
   doLast {
-    if (bwc_tests_enabled == false) {
+    if (rootBuildParams.bwcTestsEnabled.get() == false) {
       throw new GradleException('Bwc tests are disabled. They must be re-enabled after completing backcompat behavior backporting.')
     }
   }
@@ -532,9 +516,8 @@ gradle.projectsEvaluated {
 }
 
 tasks.named("validateChangelogs").configure {
-  def triggeredTaskNames = gradle.startParameter.taskNames
   onlyIf {
-    triggeredTaskNames.any(isCiSplitTask) == false
+    rootBuildParams.ciSplitBuild == false
   }
 }
 

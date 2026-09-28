@@ -12,13 +12,16 @@ package org.elasticsearch.gradle.internal.info
 import spock.lang.Ignore
 import spock.lang.Specification
 
+import org.gradle.api.Action
 import org.gradle.api.JavaVersion
 import org.gradle.api.Project
 import org.gradle.api.provider.Provider
 import org.gradle.api.provider.ProviderFactory
+import org.gradle.jvm.toolchain.JavaToolchainSpec
 import org.gradle.testfixtures.ProjectBuilder
 import org.junit.Assert
 
+import java.io.File
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.Executors
 import java.util.concurrent.Future
@@ -31,13 +34,58 @@ class BuildParameterExtensionSpec extends Specification {
 
     ProjectBuilder projectBuilder = new ProjectBuilder()
 
+    def "bwcTestsEnabled can be overridden after creation"() {
+        given:
+        def project = projectBuilder.build()
+        def providers = project.providers
+        def buildParams = extension(project, providers, true, false, true)
+
+        expect:
+        buildParams.bwcTestsEnabled.get()
+
+        when:
+        buildParams.bwcTestsEnabled.set(false)
+
+        then:
+        buildParams.bwcTestsEnabled.get() == false
+    }
+
+    def "ciSplitBuild is exposed through the typed extension"() {
+        given:
+        def project = projectBuilder.build()
+        def providers = project.providers
+
+        expect:
+        extension(project, providers, true, true, false).ciSplitBuild
+        extension(project, providers, true, false, true).ciSplitBuild == false
+    }
+
+    def "onReleaseBuild only executes action for release builds"() {
+        given:
+        def releaseProject = projectBuilder.build()
+        def snapshotProject = projectBuilder.build()
+        def releaseBuildParams = extension(releaseProject, releaseProject.providers, false, false, true)
+        def snapshotBuildParams = extension(snapshotProject, snapshotProject.providers, true, false, true)
+        Action<BuildParameterExtension> releaseAction = Mock()
+        Action<BuildParameterExtension> snapshotAction = Mock()
+
+        when:
+        releaseBuildParams.onReleaseBuild(releaseAction)
+        snapshotBuildParams.onReleaseBuild(snapshotAction)
+
+        then:
+        1 * releaseAction.execute(releaseBuildParams)
+        0 * snapshotAction.execute(_)
+    }
+
     @Ignore
     def "#getterName is cached anc concurrently accessible"() {
         given:
         def project = projectBuilder.build()
-        def providers = project.getProviders();
-        def buildParams = extension(project, providers)
-        int numberOfThreads = 10;
+        def providers = project.getProviders()
+        def buildParams = extension(project, providers, true, false, true)
+        int numberOfThreads = 10
+
         when:
         var service = Executors.newFixedThreadPool(numberOfThreads)
         var latch = new CountDownLatch(numberOfThreads)
@@ -70,44 +118,59 @@ class BuildParameterExtensionSpec extends Specification {
         ]
     }
 
-    private BuildParameterExtension extension(Project project, ProviderFactory providers) {
-        return project.getExtensions().create(
-            BuildParameterExtension.class, "buildParameters", DefaultBuildParameterExtension.class,
+    private BuildParameterExtension extension(
+        Project project,
+        ProviderFactory providers,
+        boolean snapshotBuild,
+        boolean ciSplitBuild,
+        boolean bwcTestsEnabled
+    ) {
+        def runtimeJava = new RuntimeJava(
+            providerMock(new File("/tmp/runtime-java")),
+            providerMock(JavaVersion.VERSION_11),
+            providerMock("vendor details"),
+            true
+        )
+        def toolchainSpec = providerMock(Mock(Action<JavaToolchainSpec>))
+        def gitRevision = providerMock("git-revision")
+        def gitOrigin = providerMock("git-origin")
+        def testSeed = providerMock("deadbeef:0")
+        def bwcVersions = providerMock(Mock(org.elasticsearch.gradle.internal.BwcVersions))
+        def bwcTestsEnabledProperty = project.objects.property(Boolean)
+        bwcTestsEnabledProperty.convention(bwcTestsEnabled)
+
+        return project.extensions.create(
+            BuildParameterExtension.class,
+            "buildParameters",
+            DefaultBuildParameterExtension.class,
             providers,
-            providerMock(),
-            providerMock(),
-            providerMock(),
-            true,
-            providerMock(),
-            [
-                Mock(JavaHome),
-                Mock(JavaHome),
-            ],
+            runtimeJava,
+            toolchainSpec,
+            [Mock(JavaHome), Mock(JavaHome)],
             JavaVersion.VERSION_11,
             JavaVersion.VERSION_11,
             JavaVersion.VERSION_11,
-            providerMock(),
-            providerMock(),
-            "testSeed",
+            gitRevision,
+            gitOrigin,
+            testSeed,
             false,
             5,
-            true,
-            // cannot use Mock here because of the way the provider is used by gradle internal property api
-            providerMock()
+            snapshotBuild,
+            ciSplitBuild,
+            bwcTestsEnabledProperty,
+            bwcVersions
         )
     }
 
-    private Provider providerMock() {
-        Provider provider = Mock(Provider)
+    private <T> Provider<T> providerMock(T value) {
+        Provider<T> provider = Mock(Provider)
         AtomicInteger counter = new AtomicInteger(0)
         provider.getOrNull() >> {
-            println "accessing provider"
-            return counter.get() == 1 ? fail("Accessing cached provider more than once") : counter.incrementAndGet()
+            return counter.getAndIncrement() == 1 ? fail("Accessing cached provider more than once") : value
         }
         provider.get() >> {
             fail("Accessing cached provider directly")
         }
         return provider
-
     }
 }

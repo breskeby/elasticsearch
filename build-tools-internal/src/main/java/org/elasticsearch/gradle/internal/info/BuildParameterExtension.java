@@ -13,6 +13,7 @@ import org.elasticsearch.gradle.internal.BwcVersions;
 import org.gradle.api.Action;
 import org.gradle.api.JavaVersion;
 import org.gradle.api.Task;
+import org.gradle.api.provider.Property;
 import org.gradle.api.provider.Provider;
 import org.gradle.jvm.toolchain.JavaToolchainSpec;
 
@@ -63,6 +64,12 @@ public interface BuildParameterExtension {
     Integer getDefaultParallel();
 
     Boolean getSnapshotBuild();
+
+    Boolean getCiSplitBuild();
+
+    Property<Boolean> getBwcTestsEnabled();
+
+    void onReleaseBuild(Action<? super BuildParameterExtension> action);
 
     BwcVersions getBwcVersions();
 

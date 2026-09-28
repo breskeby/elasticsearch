@@ -133,6 +133,9 @@ public class GlobalBuildInfoPlugin implements Plugin<Project> {
         Provider<BwcVersions> bwcVersionsProvider = providers.provider(
             () -> cache.updateAndGet(val -> val == null ? resolveBwcVersions(elasticsearchVersionProperty) : val)
         );
+        boolean ciSplitBuild = project.getGradle().getStartParameter().getTaskNames().stream().anyMatch(this::isCiSplitTask);
+        Property<Boolean> bwcTestsEnabled = objectFactory.property(Boolean.class);
+        bwcTestsEnabled.convention(ciSplitBuild == false);
 
         BuildParameterExtension buildParams = project.getExtensions()
             .create(
@@ -152,6 +155,8 @@ public class GlobalBuildInfoPlugin implements Plugin<Project> {
                 System.getenv("JENKINS_URL") != null || System.getenv("BUILDKITE_BUILD_URL") != null || System.getProperty("isCI") != null,
                 ParallelDetector.findDefaultParallel(project),
                 Util.getBooleanProperty("build.snapshot", true),
+                ciSplitBuild,
+                bwcTestsEnabled,
                 bwcVersionsProvider
             );
 
@@ -168,6 +173,13 @@ public class GlobalBuildInfoPlugin implements Plugin<Project> {
         if (GradleUtils.isIncludedBuild(project) == false) {
             project.getGradle().getTaskGraph().whenReady(graph -> logGlobalBuildInfo(buildParams));
         }
+    }
+
+    private boolean isCiSplitTask(String taskName) {
+        return taskName.startsWith("checkPart")
+            || taskName.startsWith("releaseTestCheck")
+            || taskName.equals("functionalTests")
+            || taskName.equals("checkBuildLogic");
     }
 
     private Provider<MetadataBasedToolChainMatcher> resolveToolchainSpecFromEnv() {

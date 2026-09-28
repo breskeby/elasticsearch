@@ -10,6 +10,7 @@
 package org.elasticsearch.gradle.internal.test.rest.compat.compat;
 
 import org.elasticsearch.gradle.internal.ElasticsearchJavaBasePlugin;
+import org.elasticsearch.gradle.internal.info.BuildParameterExtension;
 import org.elasticsearch.gradle.internal.info.GlobalBuildInfoPlugin;
 import org.elasticsearch.gradle.internal.test.rest.CopyRestApiTask;
 import org.elasticsearch.gradle.internal.test.rest.CopyRestTestsTask;
@@ -28,7 +29,6 @@ import org.gradle.api.file.FileCollection;
 import org.gradle.api.file.ProjectLayout;
 import org.gradle.api.file.RelativePath;
 import org.gradle.api.internal.file.FileOperations;
-import org.gradle.api.plugins.ExtraPropertiesExtension;
 import org.gradle.api.plugins.JavaBasePlugin;
 import org.gradle.api.provider.Provider;
 import org.gradle.api.tasks.SourceSet;
@@ -109,7 +109,6 @@ public abstract class AbstractYamlRestCompatTestPlugin implements Plugin<Project
         project.getDependencies().add(bwcMinorConfig.getName(), bwcMinor);
 
         String projectPath = project.getPath();
-        ExtraPropertiesExtension extraProperties = project.getExtensions().getExtraProperties();
         Provider<CopyRestApiTask> copyCompatYamlSpecTask = project.getTasks()
             .register("copyRestCompatApiTask", CopyRestApiTask.class, task -> {
                 task.dependsOn(bwcMinorConfig);
@@ -137,8 +136,7 @@ public abstract class AbstractYamlRestCompatTestPlugin implements Plugin<Project
                             .resolve(RELATIVE_API_PATH)
                     )
                 );
-                onlyIfBwcEnabled(task, extraProperties);
-                // task.onlyIf(t -> isEnabled(extraProperties));
+                onlyIfBwcEnabled(task, buildParams);
             });
 
         // copy compatible rest tests
@@ -176,7 +174,7 @@ public abstract class AbstractYamlRestCompatTestPlugin implements Plugin<Project
                     )
                 );
                 task.dependsOn(copyCompatYamlSpecTask);
-                onlyIfBwcEnabled(task, extraProperties);
+                onlyIfBwcEnabled(task, buildParams);
             });
 
         // copy both local source set apis and compat apis to a single location to be exported as an artifact
@@ -200,7 +198,7 @@ public abstract class AbstractYamlRestCompatTestPlugin implements Plugin<Project
                 task.getSourceDirectory().set(copyCompatYamlTestTask.flatMap(CopyRestTestsTask::getOutputResourceDir));
                 task.getOutputDirectory()
                     .set(project.getLayout().getBuildDirectory().dir(compatTestsDir.resolve("transformed").toString()));
-                onlyIfBwcEnabled(task, extraProperties);
+                onlyIfBwcEnabled(task, buildParams);
             });
 
         // Register compat rest resources with source set
@@ -258,7 +256,7 @@ public abstract class AbstractYamlRestCompatTestPlugin implements Plugin<Project
 
             // run compatibility tests after "normal" tests
             testTask.mustRunAfter(project.getTasks().named(InternalYamlRestTestPlugin.SOURCE_SET_NAME));
-            onlyIfBwcEnabled(testTask, extraProperties);
+            onlyIfBwcEnabled(testTask, buildParams);
         });
 
         setupYamlRestTestDependenciesDefaults(project, yamlCompatTestSourceSet, true);
@@ -284,13 +282,8 @@ public abstract class AbstractYamlRestCompatTestPlugin implements Plugin<Project
 
     public abstract Class<? extends Plugin<Project>> getBasePlugin();
 
-    private void onlyIfBwcEnabled(Task task, ExtraPropertiesExtension extraProperties) {
-        task.onlyIf("BWC tests disabled", t -> isEnabled(extraProperties));
-    }
-
-    private boolean isEnabled(ExtraPropertiesExtension extraProperties) {
-        Object bwcEnabled = extraProperties.getProperties().get("bwc_tests_enabled");
-        return bwcEnabled == null || (Boolean) bwcEnabled;
+    private void onlyIfBwcEnabled(Task task, BuildParameterExtension buildParams) {
+        task.onlyIf("BWC tests disabled", t -> buildParams.getBwcTestsEnabled().get());
     }
 
     // TODO: implement custom extension that allows us move around of the projects between major versions and still find them
