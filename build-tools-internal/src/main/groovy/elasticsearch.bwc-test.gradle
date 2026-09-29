@@ -35,19 +35,22 @@ ext.bwcTaskName = { Version version ->
   return "v${version}#bwcTest"
 }
 
+def bwcSnapshotDependencies = buildParams.bwcTestsEnabled.map { enabled ->
+  enabled ? tasks.matching { task -> buildParams.bwcVersions.unreleased.any { version -> bwcTaskName(version) == task.name } } : []
+}
+
+def bwcTestDependencies = buildParams.bwcTestsEnabled.map { enabled ->
+  enabled ? tasks.matching { it.name ==~ /v[0-9\.]+#bwcTest/ } : []
+}
+
 def bwcTestSnapshots = tasks.register("bwcTestSnapshots") {
-  if (buildParams.bwcTestsEnabled.get()) {
-    dependsOn tasks.matching { task -> buildParams.bwcVersions.unreleased.any { version -> bwcTaskName(version) == task.name } }
-  }
+  dependsOn(bwcSnapshotDependencies)
 }
 
 tasks.register("bwcTest") {
   description = 'Runs backwards compatibility tests.'
   group = 'verification'
-
-  if (buildParams.bwcTestsEnabled.get()) {
-    dependsOn tasks.matching { it.name ==~ /v[0-9\.]+#bwcTest/ }
-  }
+  dependsOn(bwcTestDependencies)
 }
 
 plugins.withType(ElasticsearchTestBasePlugin) {

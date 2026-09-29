@@ -65,10 +65,13 @@ public interface BuildParameterExtension {
 
     Boolean getSnapshotBuild();
 
+    /** Returns whether the requested tasks correspond to a split-CI build. */
     Boolean getCiSplitBuild();
 
+    /** Controls whether BWC test tasks should participate in this build. */
     Property<Boolean> getBwcTestsEnabled();
 
+    /** Runs the action only for release builds. */
     void onReleaseBuild(Action<? super BuildParameterExtension> action);
 
     BwcVersions getBwcVersions();
